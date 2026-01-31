@@ -13,7 +13,7 @@ export default function Header() {
           </svg>
         </div>
         <h2 className="text-xl font-extrabold tracking-tight text-[#111418] dark:text-white">
-          ServiHouse
+          ServiHouseMunchen
         </h2>
       </div>
 
