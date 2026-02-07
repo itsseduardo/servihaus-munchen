@@ -5,7 +5,7 @@ export default function Footer() {
         <div>
           <div className="flex items-center gap-2 text-primary mb-6">
             <h2 className="text-lg font-bold text-[#111418] dark:text-white">
-              ServiHouse
+              ServiHausMünchen
             </h2>
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400">

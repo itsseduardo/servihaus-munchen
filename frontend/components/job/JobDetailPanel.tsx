@@ -1,5 +1,10 @@
 import JobDetailHeader from "./JobDetailHeader";
 import JobDetailAddress from "./JobDetailAddress";
+import JobDetailMetrics from "./JobDetailMetrics";
+import JobDetailKeyInfo from "./JobDetailKeyInfo";
+import JobDetailTeam from "./JobDetailTeam";
+import JobDetailNotes from "./JobDetailNotes";
+import JobDetailFooter from "./JobDetailFooter";
 
 export default function JobDetailPanel({
   onClose,
@@ -22,6 +27,11 @@ export default function JobDetailPanel({
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
           <JobDetailAddress />
+          <JobDetailMetrics/>
+          <JobDetailKeyInfo/>
+          <JobDetailTeam/>
+          <JobDetailNotes/>
+          <JobDetailFooter/>
 
           {/* siguientes bloques aquí */}
         </div>
