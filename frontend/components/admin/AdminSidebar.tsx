@@ -7,7 +7,7 @@ export default function AdminSidebar() {
           <span className="material-symbols-outlined text-white">house</span>
         </div>
         <div>
-          <h1 className="text-lg font-extrabold">ServiHouse</h1>
+          <h1 className="text-lg font-extrabold">ServiHaus</h1>
           <p className="text-xs uppercase tracking-wider text-[#617589]">
             Management
           </p>

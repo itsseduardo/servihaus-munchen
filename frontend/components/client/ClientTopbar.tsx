@@ -19,7 +19,7 @@ export default function ClientTopbar() {
                 </div>
 
                 <h2 className="text-lg font-bold leading-tight tracking-tight">
-                    ServiHouse
+                    ServiHaus
                 </h2>
             </div>
 

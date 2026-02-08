@@ -9,7 +9,7 @@ export default function EmployeeSidebar() {
           </span>
         </div>
         <h1 className="text-xl font-extrabold tracking-tight">
-          ServiHouse
+          ServiHaus
         </h1>
       </div>
 
