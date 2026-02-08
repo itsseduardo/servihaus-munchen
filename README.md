@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # servihaus-munchen
 
 # 🏠 ServiHausMunchen
