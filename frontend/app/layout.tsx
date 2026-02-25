@@ -25,15 +25,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Esta línea importa los iconos de Google para que se rendericen los gráficos */}
+        {/* Importación de Fuentes: Manrope para el texto y Material Symbols para los iconos */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link 
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" 
+          href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" 
           rel="stylesheet" 
         />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans bg-[#f6f7f8] dark:bg-[#101922]`}>
         {children}
       </body>
     </html>

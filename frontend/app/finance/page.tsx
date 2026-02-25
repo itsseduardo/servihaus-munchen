@@ -17,7 +17,7 @@ export default function FinancePage() {
 
       <main className="max-w-[1440px] mx-auto p-6 lg:p-8">
         
-        {/* HEADER CON BOTONES (Importante) */}
+        {/* HEADER + BUTTOMS */}
         <div className="mb-8">
           <FinanceHeader />
         </div>

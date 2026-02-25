@@ -39,7 +39,7 @@ export default function Footer() {
           <ul className="space-y-4 text-sm text-gray-600 dark:text-gray-400">
             <li>📞 +49 (0) 123 456789</li>
             <li>✉️ info@servihouse.de</li>
-            <li>📍 Musterstraße 123, Munchën</li>
+            <li>📍 Einsteinstrße 2, Planneg, Munchën</li>
           </ul>
         </div>
       </div>

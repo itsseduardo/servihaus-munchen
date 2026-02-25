@@ -1,4 +1,11 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
 export default function AdminSidebar() {
+  const pathname = usePathname();
+
   return (
     <aside className="w-64 flex-shrink-0 border-r border-[#dbe0e6] dark:border-gray-800 bg-white dark:bg-background-dark flex flex-col">
       {/* Brand */}
@@ -16,10 +23,30 @@ export default function AdminSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-4 space-y-1">
-        <SidebarItem icon="dashboard" label="Dashboard" />
-        <SidebarItem icon="calendar_today" label="Calendar" active />
-        <SidebarItem icon="groups" label="Clients" />
-        <SidebarItem icon="engineering" label="Employees" />
+        <SidebarItem
+          href="/admin/dashboard"
+          icon="dashboard"
+          label="Dashboard"
+          active={pathname === "/admin/dashboard"}
+        />
+        <SidebarItem
+          href="/admin/calendar"
+          icon="calendar_today"
+          label="Calendar"
+          active={pathname === "/admin/calendar"}
+        />
+        <SidebarItem
+          href="/admin/clients"
+          icon="groups"
+          label="Clients"
+          active={pathname === "/admin/clients"}
+        />
+        <SidebarItem
+          href="/admin/employees"
+          icon="engineering"
+          label="Employees"
+          active={pathname === "/admin/employees"}
+        />
       </nav>
 
       {/* User */}
@@ -37,25 +64,29 @@ export default function AdminSidebar() {
 }
 
 function SidebarItem({
+  href,
   icon,
   label,
   active,
 }: {
+  href: string;
   icon: string;
   label: string;
   active?: boolean;
 }) {
   return (
-    <div
-      className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-colors
-        ${
-          active
-            ? "bg-primary/10 text-primary border-r-4 border-primary"
-            : "text-[#617589] hover:bg-[#f0f2f4] dark:hover:bg-gray-800"
-        }`}
-    >
-      <span className="material-symbols-outlined">{icon}</span>
-      <span className="text-sm font-semibold">{label}</span>
-    </div>
+    <Link href={href}>
+      <div
+        className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-colors
+          ${
+            active
+              ? "bg-primary/10 text-primary border-r-4 border-primary"
+              : "text-[#617589] hover:bg-[#f0f2f4] dark:hover:bg-gray-800"
+          }`}
+      >
+        <span className="material-symbols-outlined">{icon}</span>
+        <span className="text-sm font-semibold">{label}</span>
+      </div>
+    </Link>
   );
 }
