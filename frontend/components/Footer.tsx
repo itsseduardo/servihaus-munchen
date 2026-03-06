@@ -1,7 +1,7 @@
 export default function Footer() {
   return (
     <footer className="bg-white dark:bg-background-dark border-t border-gray-200 dark:border-gray-800 px-4 md:px-20 lg:px-40 py-12">
-      <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
+      <div className="max-w-300 mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
         <div>
           <div className="flex items-center gap-2 text-primary mb-6">
             <h2 className="text-lg font-bold text-[#111418] dark:text-white">
@@ -44,7 +44,7 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="max-w-[1200px] mx-auto mt-12 pt-8 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-400 flex justify-between">
+      <div className="max-w-300 mx-auto mt-12 pt-8 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-400 flex justify-between">
         <p>© 2026 ServiHausMunchen. Alle Rechte vorbehalten.</p>
       </div>
     </footer>
