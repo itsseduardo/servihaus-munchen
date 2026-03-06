@@ -1,9 +1,18 @@
+"use client"
+
+import Link from "next/link"
+import { useSession, signOut } from "next-auth/react"
+
 export default function Header() {
+  const { data: session } = useSession()
+
   return (
     <header className="flex items-center justify-between border-b border-[#f0f2f4] dark:border-[#2d3748] px-10 py-4 bg-white dark:bg-background-dark sticky top-0 z-50">
+      
+      {/* Logo */}
       <div className="flex items-center gap-4 text-primary">
         <div className="size-8">
-          <svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+          <svg fill="none" viewBox="0 0 48 48">
             <path
               fill="currentColor"
               fillRule="evenodd"
@@ -17,18 +26,47 @@ export default function Header() {
         </h2>
       </div>
 
+      {/* Nav */}
       <nav className="hidden md:flex gap-8 text-sm font-semibold">
         <a className="hover:text-primary transition-colors" href="#">Leistungen</a>
         <a className="hover:text-primary transition-colors" href="#">Über uns</a>
         <a className="hover:text-primary transition-colors" href="#">Kontakt</a>
       </nav>
 
+      {/* Right Side */}
       <div className="flex items-center gap-4">
+
         <button className="h-10 px-5 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90">
           Jetzt anrufen
         </button>
-        <div className="size-10 rounded-full bg-gray-200 dark:bg-gray-700" />
+
+        {/* AUTH SECTION */}
+        {!session ? (
+          <Link
+            href="/login"
+            className="h-10 px-5 rounded-lg border border-primary text-primary text-sm font-bold flex items-center justify-center hover:bg-primary/10"
+          >
+            Login
+          </Link>
+        ) : (
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col text-right">
+              <span className="text-sm font-bold text-[#111418] dark:text-white">
+                {session.user?.name}
+              </span>
+              <span className="text-xs text-[#617589]">
+                {session.user?.role}
+              </span>
+            </div>
+
+            <button
+              onClick={() => signOut({ callbackUrl: "/" })}
+              className="size-10 rounded-full bg-gray-200 dark:bg-gray-700 hover:opacity-80"
+              title="Logout"
+            />
+          </div>
+        )}
       </div>
     </header>
-  );
+  )
 }
