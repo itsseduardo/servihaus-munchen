@@ -14,7 +14,7 @@ export default function ClientUpcomingVisits() {
               className="bg-center bg-no-repeat bg-cover rounded-full h-14 w-14 border border-gray-100 dark:border-gray-700"
               style={{
                 backgroundImage:
-                  'url("https://lh3.googleusercontent.com/aida-public/AB6AXuDg3Qk25Y6TJjI-F5jnNpktEtTFtHUhGl_N34TAO9exK04TAh-MVH8w9M50uIyIyEF9uhSz6ucq_UavHdVyFUAbhuywblT0JD5YIDWg7lqbTSU2DqXRCPM1VNdCh9pvn6Wcfq350L8zkqsBg5sLAYYc0mp93SpIFltE8VV4Dvvy07xH4QRuUvZCd8GFjzYaJ0tJtUN_xiwmuL86GAdAnbg_jcQ_bD2EM3rmDWM0W_ND2hE7R4LJs8LqsTP0X813VEQ8_4IaBi0Y-HY")',
+                  'url("")',
               }}
             />
 
@@ -46,7 +46,7 @@ export default function ClientUpcomingVisits() {
               className="bg-center bg-no-repeat bg-cover rounded-full h-14 w-14 border border-gray-100 dark:border-gray-700"
               style={{
                 backgroundImage:
-                  'url("https://lh3.googleusercontent.com/aida-public/AB6AXuDl26ekVezw_GnzwU1ZqRo0IVXtQVCYea08vrD-w_3SR6oTEYFtnE4lZQQyjxsEUR8z5s9QTQIGk33QOBHIK7Bk2BX1fcSjsV4M8MPVcxokgjTAj1X3A9gyrYm8G8a5bBraCzQyAGEeXKYdzyEHVGN8I7aLktuy_5KXdWiD1KMvesQdmhNfN6MKH7q0nDhtvM7bxh39SajOFBMJ9La5MT9e2gLFlM5GpwbtzAlZ3W_fp_gifjNcJHX1eBkfoO67_uPVlpT8czL8edY")',
+                  'url("")',
               }}
             />
 

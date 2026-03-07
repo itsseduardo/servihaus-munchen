@@ -52,7 +52,7 @@ export default function ClientTopbar() {
                         className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-primary/20"
                         style={{
                             backgroundImage:
-                                'url("https://lh3.googleusercontent.com/aida-public/AB6AXuDdx6JJcalxZkBd4pGc7lGFhb7YfAZP_WdCnTSHjlx7zDr5EI8gxDeLG0yBFYBwt_YZmO3CUXwjnjaZ3-y6glvzq32qRm-wqjuzkaojoLhRAbvS-vNYa-7zQ2ZiW3s79dowL9WCzB22ZxdVmk8oAH4_dGFB36Efl2SGrQxhVU4mniBuU00xMngUqKrrNStspPHbMPf4eM8G7qdWGzM1_Fg3EC4L9iqQn3C_aolXYRva9BorNvdeAfbWF0pVSE0ghCY83dhNYFXxqf0")',
+                                'url("")',
                         }}
                     />
                 </div>

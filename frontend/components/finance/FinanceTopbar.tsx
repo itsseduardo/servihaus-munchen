@@ -58,7 +58,7 @@ export default function FinanceTopbar() {
           <img
             className="w-full h-full object-cover"
             alt="Finance user avatar"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdzXa64S1CoPQFu4K38f74l2yd9DyBJL5Ka8kpzEKw17jwJmcb-vjhG8Yuznd1Z8khd1y2l4rDfK8TCWJlMygKY8WOTw7cL3gipx-Vs7aSy2rpz2tbct_iJ0Tocr1CATKYi-Q8WWssJoDPVkLGnM8vjWtTNLASRSzpCYTbKVDonC2knxikx0jrVet_O8OCyx2pglKKCSg6gE-ganfHAyt9RRiD1DVsXA_ho9WpCrePx2b9aRBrCJGU6wfRyXt0CJhJmfwI6pZK4HE"
+            src=""
           />
         </div>
       </div>

@@ -29,7 +29,7 @@ export default function FinanceFooter() {
             <img
               className="opacity-50 grayscale"
               alt="Certified Audit Logo"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCTqhzyI8ijs8jxEOuVAXHce3r4oIVNLLivSNzB7OfKHWEE0nUsliN0dC-VqJeulIuiaySksVeNNSlLo9phsQ2iqtZZDBgARrUKdyRiNclKtWj_PMryGSsG9KjBZD2uPMOgmXwEltJQA0aHB1EaIhBl6Gotf__2zr7S-V99IHaR7L1qJKnZc35ah5-RsK3vLhSCTvpxvbK96i1zKh_yUNYpSTiRLzPHUViSFWHVjiuGDxmSnz3VfrixFzkytpRewBtxQ7yA-OXW9Wg"
+              src=""
             />
             <div className="h-8 w-px bg-gray-200 dark:bg-gray-700" />
             <p className="text-xs font-bold">ServiHauseMünchen GRC</p>
