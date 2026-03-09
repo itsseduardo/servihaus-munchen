@@ -5,7 +5,7 @@ export default function Hero() {
         <div className="min-h-[520px] flex flex-col items-center justify-center gap-8 rounded-xl p-8 relative overflow-hidden shadow-2xl bg-cover bg-center"
           style={{
             backgroundImage:
-              "linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.6)), url('https://lh3.googleusercontent.com/aida-public/AB6AXuDoXJZr8ZymSEp2rvObTOK1XB-GIKv2nscWnnobspKuMULaY_ra79HesmEJpxLg_bXfgtZcjI4L9OpFYmYaWe8TbzY2FwWbGpWagzAqehRKMAubW8aWiLaC1821H6NwxCJSuMlhYBwqxTItIzsrZMTKYxiOfI1oxwGN9IJRaRjw25s6cbAqvHbQp2__YUCJeP518T45MeWi5iANhcjzOfid_IdlqGGBGACNH19pyS73lmCd7tCJ3LNiLLGqvaqY5ZqndAMHLhZ5Al0')",
+              "linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.6)), url('')",
           }}
         >
           <div className="max-w-[800px] text-center z-10">

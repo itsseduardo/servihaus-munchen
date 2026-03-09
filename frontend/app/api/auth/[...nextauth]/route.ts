@@ -1,3 +1,4 @@
+console.log("SECRET VALUE:", process.env.NEXTAUTH_SECRET)
 import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { PrismaClient } from "@prisma/client"
