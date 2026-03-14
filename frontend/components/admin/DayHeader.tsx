@@ -4,23 +4,22 @@ interface Day {
   active?: boolean;
 }
 
-export default function DayHeader({ days }: { days: Day[] }) {
+export default function DayHeader({ days }: { days: any[] }) {
   return (
-    <div className="grid grid-cols-7 gap-4 mb-4">
-      {days.map((day) => (
+    <div className="grid grid-cols-[80px_repeat(7,1fr)] border-b bg-white dark:bg-slate-900">
+
+      {/* Columna vacía para alinear con horas */}
+      <div />
+
+      {days.map((day, i) => (
         <div
-          key={day.label}
-          className={`text-center py-2 border-b-2 ${
-            day.active
-              ? "border-primary text-primary"
-              : "border-transparent text-[#617589]"
-          }`}
+          key={i}
+          className="text-center py-3 font-semibold border-r last:border-r-0"
         >
-          <p className="text-xs font-bold uppercase">
-            {day.label} {day.date}
-          </p>
+          <div>{day.label}</div>
+          <div className="text-sm text-gray-500">{day.date}</div>
         </div>
       ))}
     </div>
-  );
+  )
 }

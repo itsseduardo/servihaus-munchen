@@ -21,3 +21,30 @@ model User {
   role      Role     @default(EMPLOYEE)
   createdAt DateTime @default(now())
 }
+
+model Client {
+  id          Int       @id @default(autoincrement())
+  clientCode  String    @unique
+  name        String
+  phone       String?
+  email       String?
+  services    Service[]
+  createdAt   DateTime  @default(now())
+}
+
+model Service {
+  id            Int      @id @default(autoincrement())
+  code          String   @unique
+  serviceType   String
+  date          DateTime
+  time          String
+  duration      String?
+  address       String
+  status        String
+  requiresKey   Boolean  @default(false)
+
+  clientId      Int
+  client        Client   @relation(fields: [clientId], references: [id])
+
+  createdAt     DateTime @default(now())
+}

@@ -40,7 +40,7 @@ export default function LoginPage() {
             <span className="material-symbols-outlined">home_repair_service</span>
           </div>
           <h1 className="text-slate-900 dark:text-slate-100 text-xl font-bold uppercase tracking-widest">
-            ServiHouse
+            ServiHaus
           </h1>
         </div>
       </header>
