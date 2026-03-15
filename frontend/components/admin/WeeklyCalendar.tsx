@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react"
 import CreateServiceModal from "@/components/admin/CreateServiceModal"
+import ServiceDetailsModal from "@/components/admin/ServiceDetailsModal"
 
-const START_HOUR = 7
-const END_HOUR = 19
+const START_HOUR = 6
+const END_HOUR = 22
 const HOUR_HEIGHT = 80
+const TOTAL_HOURS = END_HOUR - START_HOUR
 
 type DayType = {
   iso: string
@@ -21,6 +23,8 @@ type ServiceType = {
   time: string
   duration?: string
   address: string
+  notes?: string
+  requiresKey?: boolean
 }
 
 type WeeklyCalendarProps = {
@@ -32,11 +36,14 @@ export default function WeeklyCalendar({
   days,
   servicesByDay,
 }: WeeklyCalendarProps) {
-
   const [currentTop, setCurrentTop] = useState<number | null>(null)
-  const [open, setOpen] = useState(false)
+
+  const [openCreate, setOpenCreate] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
+
+  const [selectedService, setSelectedService] = useState<ServiceType | null>(null)
+  const [openDetails, setOpenDetails] = useState(false)
 
   // Línea roja hora actual
   useEffect(() => {
@@ -45,7 +52,7 @@ export default function WeeklyCalendar({
       const hour = now.getHours()
       const minutes = now.getMinutes()
 
-      if (hour < START_HOUR || hour > END_HOUR) {
+      if (hour < START_HOUR || hour >= END_HOUR) {
         setCurrentTop(null)
         return
       }
@@ -59,14 +66,15 @@ export default function WeeklyCalendar({
 
     updateLine()
     const interval = setInterval(updateLine, 60000)
-
     return () => clearInterval(interval)
   }, [])
 
   const hours = Array.from(
-    { length: END_HOUR - START_HOUR + 1 },
+    { length: TOTAL_HOURS },
     (_, i) => START_HOUR + i
   )
+
+  const totalHeight = TOTAL_HOURS * HOUR_HEIGHT
 
   return (
     <>
@@ -86,12 +94,15 @@ export default function WeeklyCalendar({
         </div>
 
         {/* Grid semanal */}
-        <div className="grid grid-cols-7 flex-1 relative">
-
+        <div
+          className="grid grid-cols-7 flex-1 relative"
+          style={{ height: totalHeight }}
+        >
           {days.map((day) => (
             <div
               key={day.iso}
               className="relative border-r last:border-r-0 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+              style={{ height: totalHeight }}
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect()
                 const offsetY = e.clientY - rect.top
@@ -108,10 +119,9 @@ export default function WeeklyCalendar({
 
                 setSelectedDate(day.iso)
                 setSelectedTime(formattedTime)
-                setOpen(true)
+                setOpenCreate(true)
               }}
             >
-
               {/* Líneas horizontales */}
               {hours.map((h) => (
                 <div
@@ -132,7 +142,7 @@ export default function WeeklyCalendar({
                   (startMinutes / 60) * HOUR_HEIGHT
 
                 const durationHours = service.duration
-                  ? parseFloat(service.duration.replace(" Std", ""))
+                  ? parseFloat(service.duration)
                   : 1
 
                 const height = durationHours * HOUR_HEIGHT
@@ -140,9 +150,13 @@ export default function WeeklyCalendar({
                 return (
                   <div
                     key={service.id}
-                    className="absolute left-1 right-1 bg-primary text-white rounded-lg p-2 text-xs shadow z-10"
+                    className="absolute left-1 right-1 bg-primary text-white rounded-lg p-2 text-xs shadow z-10 hover:scale-[1.02] transition"
                     style={{ top, height }}
-                    onClick={(e) => e.stopPropagation()} // evita abrir modal si haces click en servicio
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedService(service)
+                      setOpenDetails(true)
+                    }}
                   >
                     <div className="font-bold">{service.code}</div>
                     <div>{service.address}</div>
@@ -165,14 +179,26 @@ export default function WeeklyCalendar({
         </div>
       </div>
 
-      {/* Modal */}
-      {open && selectedDate && selectedTime && (
+      {/* Modal crear */}
+      {openCreate && selectedDate && selectedTime && (
         <CreateServiceModal
           selectedDate={selectedDate}
           selectedTime={selectedTime}
-          onClose={() => setOpen(false)}
+          onClose={() => setOpenCreate(false)}
           onCreated={() => {
-            setOpen(false)
+            setOpenCreate(false)
+            location.reload()
+          }}
+        />
+      )}
+
+      {/* Modal detalles */}
+      {openDetails && selectedService && (
+        <ServiceDetailsModal
+          service={selectedService}
+          onClose={() => setOpenDetails(false)}
+          onUpdated={() => {
+            setOpenDetails(false)
             location.reload()
           }}
         />

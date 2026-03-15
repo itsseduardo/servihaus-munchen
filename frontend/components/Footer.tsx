@@ -37,8 +37,8 @@ export default function Footer() {
         <div>
           <h4 className="font-bold mb-6">Kontakt</h4>
           <ul className="space-y-4 text-sm text-gray-600 dark:text-gray-400">
-            <li>📞 +49 (0) 123 456789</li>
-            <li>✉️ info@servihouse.de</li>
+            <li>📞 +49 (1) 724595395</li>
+            <li>✉️ josevc@servihausmunchen.de</li>
             <li>📍 Einsteinstrße 2, Planneg, Munchën</li>
           </ul>
         </div>
@@ -46,6 +46,7 @@ export default function Footer() {
 
       <div className="max-w-300 mx-auto mt-12 pt-8 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-400 flex justify-between">
         <p>© 2026 ServiHausMunchen. Alle Rechte vorbehalten.</p>
+        <p>Dev by ItssEduardo.</p>
       </div>
     </footer>
   );

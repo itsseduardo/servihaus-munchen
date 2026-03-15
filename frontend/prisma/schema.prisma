@@ -1,6 +1,7 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 generator client {
@@ -20,12 +21,15 @@ model User {
   password  String
   role      Role     @default(EMPLOYEE)
   createdAt DateTime @default(now())
+
+  employee  Employee?
 }
 
 model Client {
   id          Int       @id @default(autoincrement())
   clientCode  String    @unique
   name        String
+  address     String?
   phone       String?
   email       String?
   services    Service[]
@@ -33,18 +37,55 @@ model Client {
 }
 
 model Service {
-  id            Int      @id @default(autoincrement())
-  code          String   @unique
-  serviceType   String
-  date          DateTime
-  time          String
-  duration      String?
-  address       String
-  status        String
-  requiresKey   Boolean  @default(false)
+  id           Int      @id @default(autoincrement())
+  code         String   @unique
+  serviceType  String
+  date         DateTime
+  time         String
+  duration     String?  // puedes cambiarlo a Float más adelante si quieres precisión
+  address      String
+  status       String
+  requiresKey  Boolean  @default(false)
+  notes        String?
 
-  clientId      Int
-  client        Client   @relation(fields: [clientId], references: [id])
+  clientId     Int
+  client       Client   @relation(fields: [clientId], references: [id])
 
-  createdAt     DateTime @default(now())
+  assignments  ServiceAssignment[]
+
+  createdAt    DateTime @default(now())
+}
+
+model Employee {
+  id          Int      @id @default(autoincrement())
+  name        String
+  profession  String
+  email       String   @unique
+  phone       String?
+  hourlyRate  Float?
+
+  userId      String?  @unique
+  user        User?    @relation(fields: [userId], references: [id])
+
+  assignments ServiceAssignment[]
+
+  createdAt   DateTime @default(now())
+}
+
+model ServiceAssignment {
+  id          Int      @id @default(autoincrement())
+
+  serviceId   Int
+  employeeId  Int
+
+  service     Service  @relation(fields: [serviceId], references: [id])
+  employee    Employee @relation(fields: [employeeId], references: [id])
+
+  workedHours Float?
+  notes       String?
+  status      String?  // assigned | completed
+
+  createdAt   DateTime @default(now())
+
+  @@unique([serviceId, employeeId])
 }

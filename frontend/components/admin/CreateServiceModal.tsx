@@ -24,8 +24,10 @@ export default function CreateServiceModal({
   const [duration, setDuration] = useState("")
   const [requiresKey, setRequiresKey] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [employees, setEmployees] = useState<any[]>([])
+  const [selectedEmployees, setSelectedEmployees] = useState<number[]>([])
 
-  // 👇 Si el usuario hace click en otra celda mientras el modal está abierto
+  // Si el usuario hace click en otra celda mientras el modal está abierto
   useEffect(() => {
     setTime(selectedTime)
   }, [selectedTime])
@@ -47,6 +49,20 @@ export default function CreateServiceModal({
     return () => clearTimeout(timeout)
   }, [clientName])
 
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const res = await fetch("/api/employees")
+        const data = await res.json()
+        setEmployees(data)
+      } catch (error) {
+        console.error("Error loading employees:", error)
+      }
+    }
+
+    fetchEmployees()
+  }, [])
+
   const handleSubmit = async () => {
     if (!clientName || !address || !time) {
       alert("Please fill required fields")
@@ -67,6 +83,7 @@ export default function CreateServiceModal({
         time,
         duration,
         requiresKey,
+        employees: selectedEmployees,
       }),
     })
 
@@ -202,6 +219,42 @@ export default function CreateServiceModal({
             </div>
           </section>
 
+          <section className="space-y-4">
+            <h3 className="text-xs font-bold uppercase text-primary">
+              Mitarbeiter zuweisen
+            </h3>
+
+            <div className="grid grid-cols-2 gap-3">
+              {employees.map((emp) => (
+                <label
+                  key={emp.id}
+                  className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50 transition"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedEmployees.includes(emp.id)}
+                    onChange={() => {
+                      if (selectedEmployees.includes(emp.id)) {
+                        setSelectedEmployees(
+                          selectedEmployees.filter((id) => id !== emp.id)
+                        )
+                      } else {
+                        setSelectedEmployees([...selectedEmployees, emp.id])
+                      }
+                    }}
+                  />
+
+                  <div className="flex flex-col">
+                    <span className="font-medium">{emp.name}</span>
+                    <span className="text-xs text-gray-500">
+                      {emp.profession}
+                    </span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </section>
+
           {/* Schlüssel */}
           <section className="flex justify-between items-center bg-primary/5 p-4 rounded-xl">
             <span className="font-semibold">
@@ -235,4 +288,4 @@ export default function CreateServiceModal({
       </div>
     </div>
   )
-}
+}   

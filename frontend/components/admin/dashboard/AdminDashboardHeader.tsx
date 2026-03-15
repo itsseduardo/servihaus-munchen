@@ -8,7 +8,7 @@ export default function AdminDashboardHeader() {
           Business Analytics
         </h2>
         <p className="text-[#616b89] dark:text-slate-400 text-sm">
-          Executive overview of service scheduling and revenue performance for ServiHouse.
+          Executive overview of service scheduling and revenue performance for ServiHaus.
         </p>
       </div>
 

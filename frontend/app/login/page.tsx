@@ -69,7 +69,7 @@ export default function LoginPage() {
               </label>
               <input
                 type="email"
-                placeholder="name@servihouse.de"
+                placeholder="name@servihausmunchen.de"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-base"

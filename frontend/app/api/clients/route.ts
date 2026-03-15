@@ -17,6 +17,12 @@ export async function GET(req: Request) {
         name: "asc",
       },
       take: 10,
+      select: {
+        id: true,
+        name: true,
+        clientCode: true,
+        address: true,
+      },
     })
 
     return NextResponse.json(clients)

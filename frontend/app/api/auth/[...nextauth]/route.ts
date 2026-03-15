@@ -1,4 +1,3 @@
-console.log("SECRET VALUE:", process.env.NEXTAUTH_SECRET)
 import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { PrismaClient } from "@prisma/client"
@@ -28,8 +27,7 @@ const handler = NextAuth({
                     where: { email: credentials.email },
                 })
 
-                console.log("EMAIL RECIBIDO:", credentials.email)
-                console.log("USER FROM DB:", user)
+               
 
                 if (!user) return null
 
@@ -38,7 +36,7 @@ const handler = NextAuth({
                     user.password
                 )
 
-                console.log("PASSWORD MATCH:", isValid)
+                
 
                 if (!isValid) return null
 
