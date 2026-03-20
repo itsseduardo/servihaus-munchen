@@ -1,13 +1,20 @@
 import { prisma } from "@/lib/prisma"
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 
 export async function PUT(
-  req: Request,
-  context: { params: { id: string } }
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await context.params
     const serviceId = parseInt(id)
+
+    if (isNaN(serviceId)) {
+      return NextResponse.json(
+        { error: "Invalid service id" },
+        { status: 400 }
+      )
+    }
 
     const body = await req.json()
 
@@ -42,12 +49,19 @@ export async function PUT(
 }
 
 export async function DELETE(
-  req: Request,
+  req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await context.params
     const serviceId = parseInt(id)
+
+    if (isNaN(serviceId)) {
+      return NextResponse.json(
+        { error: "Invalid service id" },
+        { status: 400 }
+      )
+    }
 
     await prisma.serviceAssignment.deleteMany({
       where: { serviceId },
