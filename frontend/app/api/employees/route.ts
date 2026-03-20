@@ -10,18 +10,29 @@ export async function GET() {
       orderBy: {
         name: "asc",
       },
-      select: {
-        id: true,
-        name: true,
-        profession: true,
-        email: true,
-        phone: true,
-        hourlyRate: true,
-        userId: true,
+      include: {
+        _count: {
+          select: {
+            assignments: true, // ← nombre exacto de tu relación
+          },
+        },
       },
     })
 
-    return NextResponse.json(employees)
+    const formatted = employees.map(emp => ({
+      id: emp.id,
+      name: emp.name,
+      profession: emp.profession,
+      email: emp.email,
+      phone: emp.phone,
+      hourlyRate: emp.hourlyRate,
+      userId: emp.userId,
+      hasLogin: !!emp.userId,
+      servicesCount: emp._count.assignments, // ← ahora sí existe
+    }))
+
+    return NextResponse.json(formatted)
+
   } catch (error) {
     console.error("EMPLOYEES GET ERROR:", error)
     return NextResponse.json(

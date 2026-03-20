@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 
 export async function PUT(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: { id: string } }
 ) {
   try {
     const { id } = await context.params
@@ -11,12 +11,23 @@ export async function PUT(
 
     const body = await req.json()
 
+    const updateData: any = {}
+
+    if (body.status) {
+      updateData.status = body.status
+
+      if (body.status === "completed") {
+        updateData.actualEndTime = new Date()
+      }
+    }
+
+    if (body.notes !== undefined) {
+      updateData.notes = body.notes
+    }
+
     const updated = await prisma.service.update({
       where: { id: serviceId },
-      data: {
-        notes: body.notes,
-        status: body.status,
-      },
+      data: updateData,
     })
 
     return NextResponse.json(updated)
@@ -24,7 +35,7 @@ export async function PUT(
   } catch (error) {
     console.error("SERVICE UPDATE ERROR:", error)
     return NextResponse.json(
-      { error: "Update failed" },
+      { error: "Server error" },
       { status: 500 }
     )
   }

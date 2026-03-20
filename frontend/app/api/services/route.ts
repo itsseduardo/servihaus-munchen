@@ -17,23 +17,61 @@ export async function POST(req: Request) {
       employees,
     } = body
 
-    if (!clientName || !date || !time || !address) {
+    if (!clientName || !date || !time || !address || !duration) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       )
     }
 
+    const startTime = new Date(`${date}T${time}`)
+    const durationHours = Number(duration)
+
+    const plannedEndTime = new Date(
+      startTime.getTime() + durationHours * 60 * 60 * 1000
+    )
+
+    //  VALIDACIÓN DE SOLAPAMIENTO
+    if (employees?.length) {
+      for (const employeeId of employees) {
+
+        const conflicts = await prisma.serviceAssignment.findMany({
+          where: {
+            employeeId,
+            service: {
+              AND: [
+                { startTime: { lt: plannedEndTime } },
+                {
+                  OR: [
+                    { actualEndTime: null },
+                    { actualEndTime: { gt: startTime } }
+                  ]
+                }
+              ]
+            }
+          },
+          include: { service: true }
+        })
+
+        if (conflicts.length > 0) {
+          return NextResponse.json(
+            {
+              error: `Employee ${employeeId} already has a service in this time range`
+            },
+            { status: 400 }
+          )
+        }
+      }
+    }
+
     let client
 
-    //  Si viene clientId → usar existente
     if (clientId) {
       client = await prisma.client.findUnique({
         where: { id: clientId },
       })
     }
 
-    //  Si no existe → crear nuevo
     if (!client) {
       const lastClient = await prisma.client.findFirst({
         orderBy: { id: "desc" },
@@ -44,59 +82,48 @@ export async function POST(req: Request) {
       client = await prisma.client.create({
         data: {
           name: clientName,
-          clientCode: `KD - ${nextNumber}`,
-        address,
+          clientCode: `KD-${nextNumber}`,
         },
       })
     }
 
-    // 🔹 Crear servicio temporal
     const tempService = await prisma.service.create({
       data: {
         code: "TEMP",
         serviceType: serviceType || "General Service",
         date: new Date(date),
         time,
-        duration: duration || null, // sigue siendo string en tu schema
+        duration,
+        startTime,
         address,
-        status: "confirmed",
+        status: "assigned",
         requiresKey: requiresKey || false,
         clientId: client.id,
-
-        // 🔹 Crear asignaciones si hay empleados
-        assignments:
-          employees && employees.length > 0
-            ? {
+        assignments: employees?.length
+          ? {
               create: employees.map((employeeId: number) => ({
-                employee: {
-                  connect: { id: employeeId },
-                },
+                employee: { connect: { id: employeeId } },
               })),
             }
-            : undefined,
+          : undefined,
       },
     })
 
-    // 🔹 Generar código definitivo del servicio
-    const finalCode = `SH - ${1000 + tempService.id}`
+    const finalCode = `SH-${1000 + tempService.id}`
 
     const updated = await prisma.service.update({
       where: { id: tempService.id },
       data: { code: finalCode },
-      include: {
-        assignments: {
-          include: {
-            employee: true,
-          },
-        },
-      },
     })
 
     return NextResponse.json(updated)
 
   } catch (error) {
-    console.error("POST ERROR:", error)
-    return NextResponse.json({ error: "Server error" }, { status: 500 })
+    console.error("SERVICE CREATE ERROR:", error)
+    return NextResponse.json(
+      { error: "Server error" },
+      { status: 500 }
+    )
   }
 }
 

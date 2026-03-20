@@ -37,23 +37,28 @@ model Client {
 }
 
 model Service {
-  id           Int      @id @default(autoincrement())
-  code         String   @unique
-  serviceType  String
-  date         DateTime
-  time         String
-  duration     String?  // puedes cambiarlo a Float más adelante si quieres precisión
-  address      String
-  status       String
-  requiresKey  Boolean  @default(false)
-  notes        String?
+  id             Int       @id @default(autoincrement())
+  code           String    @unique
+  serviceType    String
 
-  clientId     Int
-  client       Client   @relation(fields: [clientId], references: [id])
+  date           DateTime  // lo dejamos por ahora
+  time           String     // lo dejamos por ahora
+  duration       String?    // lo dejamos por ahora
 
-  assignments  ServiceAssignment[]
+  startTime      DateTime?  // NUEVO
+  actualEndTime  DateTime?  // NUEVO
 
-  createdAt    DateTime @default(now())
+  address        String
+  status         String
+  requiresKey    Boolean    @default(false)
+  notes          String?
+
+  clientId       Int
+  client         Client     @relation(fields: [clientId], references: [id])
+
+  assignments    ServiceAssignment[]
+
+  createdAt      DateTime  @default(now())
 }
 
 model Employee {
