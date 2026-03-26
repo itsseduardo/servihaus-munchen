@@ -2,18 +2,9 @@
 
 import { useState, useEffect } from "react"
 import AdminCalendarTopbar from "@/components/admin/AdminCalendarTopbar"
-import DayHeader from "@/components/admin/DayHeader"
 import WeeklyCalendar from "@/components/admin/WeeklyCalendar"
 import { useWeek } from "@/hooks/useWeek"
-
-type ServiceType = {
-  id: number
-  code: string
-  date: string
-  time: string
-  duration?: string
-  address: string
-}
+import { ServiceType } from "@/types/service"
 
 export default function AdminCalendarPage() {
   const [currentWeek, setCurrentWeek] = useState(new Date())
@@ -21,7 +12,7 @@ export default function AdminCalendarPage() {
 
   const { days } = useWeek(currentWeek)
 
-  // FETCH SERVICIOS DE LA SEMANA
+  // Fetch servicios por cada día de la semana
   useEffect(() => {
     async function fetchServices() {
       try {
@@ -44,15 +35,16 @@ export default function AdminCalendarPage() {
     if (days.length > 0) {
       fetchServices()
     }
-  }, [currentWeek]) // SOLO depende de currentWeek
+  }, [currentWeek])
 
-  // AGRUPAR POR DIA ISO
-  const servicesByDay = days.reduce((acc, day) => {
-    acc[day.iso] = services.filter((service) =>
-      new Date(service.date).toISOString().startsWith(day.iso)
-    )
-    return acc
-  }, {} as Record<string, ServiceType[]>)
+  // Agrupar servicios por día ISO
+  const servicesByDay: Record<string, ServiceType[]> =
+    days.reduce((acc, day) => {
+      acc[day.iso] = services.filter((service) =>
+        new Date(service.date).toISOString().startsWith(day.iso)
+      )
+      return acc
+    }, {} as Record<string, ServiceType[]>)
 
   return (
     <>
@@ -62,20 +54,10 @@ export default function AdminCalendarPage() {
       />
 
       <div className="flex-1 overflow-auto p-6">
-        <DayHeader
-          days={days.map((d) => ({
-            label: d.label,
-            date: Number(d.date),
-            active: d.isToday,
-          }))}
+        <WeeklyCalendar
+          days={days}
+          servicesByDay={servicesByDay}
         />
-
-        <div className="mt-4">
-          <WeeklyCalendar
-            days={days}
-            servicesByDay={servicesByDay}
-          />
-        </div>
       </div>
     </>
   )

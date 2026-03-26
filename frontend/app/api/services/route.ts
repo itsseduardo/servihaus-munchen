@@ -6,65 +6,98 @@ export async function POST(req: Request) {
     const body = await req.json()
 
     const {
-      clientName,
       clientId,
-      serviceType,
+      clientCode,
+      clientName,
+      serviceCodeId,      // ID del catálogo ServiceCode
       date,
       time,
       duration,
       address,
       requiresKey,
       employees,
+      notes,
+      importantNotes,
     } = body
 
-    if (!clientName || !date || !time || !address || !duration) {
+    const durationHours = Number(duration)
+
+    if (
+      !clientName ||
+      !address ||
+      !date ||
+      !time ||
+      isNaN(durationHours) ||
+      durationHours <= 0
+    ) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Missing or invalid fields" },
         { status: 400 }
       )
     }
 
-    const startTime = new Date(`${date}T${time}`)
-    const durationHours = Number(duration)
+
+    // =========================
+    // FECHA Y HORA
+    // =========================
+    const [year, month, day] = date.split("-").map(Number)
+    const serviceDate = new Date(Date.UTC(year, month - 1, day))
+
+    const [hours, minutes] = time.split(":").map(Number)
+
+    const startTime = new Date(
+      year,
+      month - 1,
+      day,
+      hours,
+      minutes,
+      0,
+      0
+    )
 
     const plannedEndTime = new Date(
       startTime.getTime() + durationHours * 60 * 60 * 1000
     )
 
-    //  VALIDACIÓN DE SOLAPAMIENTO
+    // =========================
+    // VALIDAR SOLAPAMIENTO
+    // =========================
     if (employees?.length) {
       for (const employeeId of employees) {
-
-        const conflicts = await prisma.serviceAssignment.findMany({
-          where: {
-            employeeId,
-            service: {
-              AND: [
-                { startTime: { lt: plannedEndTime } },
-                {
-                  OR: [
-                    { actualEndTime: null },
-                    { actualEndTime: { gt: startTime } }
-                  ]
-                }
-              ]
-            }
-          },
-          include: { service: true }
+        const existingAssignments = await prisma.serviceAssignment.findMany({
+          where: { employeeId },
+          include: { service: true },
         })
 
-        if (conflicts.length > 0) {
-          return NextResponse.json(
-            {
-              error: `Employee ${employeeId} already has a service in this time range`
-            },
-            { status: 400 }
+        for (const assignment of existingAssignments) {
+          const existing = assignment.service
+
+          if (!existing.startTime || !existing.duration) continue
+
+          const existingStart = new Date(existing.startTime)
+          const existingEnd = new Date(
+            existingStart.getTime() +
+            existing.duration * 60 * 60 * 1000
           )
+
+          const overlaps =
+            startTime < existingEnd &&
+            plannedEndTime > existingStart
+
+          if (overlaps) {
+            return NextResponse.json(
+              { error: "Employee already assigned in this time range" },
+              { status: 400 }
+            )
+          }
         }
       }
     }
 
-    let client
+    // =========================
+    // OBTENER O CREAR CLIENTE
+    // =========================
+    let client = null
 
     if (clientId) {
       client = await prisma.client.findUnique({
@@ -72,51 +105,56 @@ export async function POST(req: Request) {
       })
     }
 
-    if (!client) {
-      const lastClient = await prisma.client.findFirst({
-        orderBy: { id: "desc" },
+    if (!client && clientCode) {
+      client = await prisma.client.findUnique({
+        where: { clientCode },
       })
+    }
 
-      const nextNumber = lastClient ? lastClient.id + 1 : 1000
+    if (!client) {
+      if (!clientCode) {
+        return NextResponse.json(
+          { error: "Client code required for new client" },
+          { status: 400 }
+        )
+      }
 
       client = await prisma.client.create({
         data: {
+          clientCode,
           name: clientName,
-          clientCode: `KD-${nextNumber}`,
+          address: address || null,
         },
       })
     }
 
-    const tempService = await prisma.service.create({
+    // =========================
+    // CREAR SERVICIO
+    // =========================
+    
+    const service = await prisma.service.create({
       data: {
-        code: "TEMP",
-        serviceType: serviceType || "General Service",
-        date: new Date(date),
-        time,
-        duration,
+        serviceCodeId: body.serviceCodeId ? Number(serviceCodeId) : null, 
+        date: serviceDate,
         startTime,
+        duration: durationHours,
         address,
         status: "assigned",
         requiresKey: requiresKey || false,
+        notes: notes || null,
+        importantNotes: importantNotes || null,
         clientId: client.id,
         assignments: employees?.length
           ? {
-              create: employees.map((employeeId: number) => ({
-                employee: { connect: { id: employeeId } },
-              })),
-            }
+            create: employees.map((employeeId: number) => ({
+              employee: { connect: { id: employeeId } },
+            })),
+          }
           : undefined,
       },
     })
 
-    const finalCode = `SH-${1000 + tempService.id}`
-
-    const updated = await prisma.service.update({
-      where: { id: tempService.id },
-      data: { code: finalCode },
-    })
-
-    return NextResponse.json(updated)
+    return NextResponse.json(service)
 
   } catch (error) {
     console.error("SERVICE CREATE ERROR:", error)
@@ -157,19 +195,31 @@ export async function GET(req: Request) {
       },
       include: {
         client: true,
+        serviceCode: true,
         assignments: {
           include: {
             employee: true,
-
-          }
-        }
+          },
+        },
       },
       orderBy: {
-        time: "asc",
+        startTime: "asc",
       },
     })
 
-    return NextResponse.json(services)
+    const formatted = services.map(service => ({
+      ...service,
+      time: service.startTime
+        ? service.startTime.toLocaleTimeString("de-DE", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })
+        : null,
+    }))
+
+    return NextResponse.json(formatted)
+
   } catch (error) {
     console.error("GET ERROR:", error)
     return NextResponse.json([], { status: 200 })

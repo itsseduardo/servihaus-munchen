@@ -6,11 +6,14 @@ import CreateEmployeeModal from "@/components/admin/CreateEmployeeModal"
 
 interface Employee {
   id: number
-  name: string
+  firstName: string
+  lastName: string
   profession: string
   email: string
   phone: string | null
   hourlyRate: number | null
+  employmentType: "HOURLY" | "FIXED"
+  contractedHoursPerDay: number | null
 }
 
 export default function AdminEmployeesPage() {
@@ -22,24 +25,22 @@ export default function AdminEmployeesPage() {
   const [loading, setLoading] = useState(true)
 
   const fetchEmployees = async () => {
-  try {
-    const res = await fetch("/api/employees")
-    const data = await res.json()
+    try {
+      const res = await fetch("/api/employees")
+      const data = await res.json()
 
-    if (Array.isArray(data)) {
-      setEmployees(data)
-    } else {
-      console.error("Employees API did not return array:", data)
+      if (Array.isArray(data)) {
+        setEmployees(data)
+      } else {
+        setEmployees([])
+      }
+
+    } catch {
       setEmployees([])
+    } finally {
+      setLoading(false)
     }
-
-  } catch (error) {
-    console.error("Failed to fetch employees", error)
-    setEmployees([])
-  } finally {
-    setLoading(false)
   }
-}
 
   useEffect(() => {
     fetchEmployees()
@@ -76,11 +77,13 @@ export default function AdminEmployeesPage() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-50 border-b">
-              <th className="p-4 text-sm font-semibold">Name</th>
+              <th className="p-4 text-sm font-semibold">Vorname</th>
+              <th className="p-4 text-sm font-semibold">Nachname</th>
               <th className="p-4 text-sm font-semibold">Profession</th>
               <th className="p-4 text-sm font-semibold">Email</th>
-              <th className="p-4 text-sm font-semibold">Phone</th>
-              <th className="p-4 text-sm font-semibold">Hourly Rate</th>
+              <th className="p-4 text-sm font-semibold">Telefon</th>
+              <th className="p-4 text-sm font-semibold">Anstellungsart</th>
+              <th className="p-4 text-sm font-semibold">Rate / Stunden</th>
             </tr>
           </thead>
 
@@ -93,15 +96,44 @@ export default function AdminEmployeesPage() {
                   router.push(`/admin/employees/${employee.id}`)
                 }
               >
-                <td className="p-4">{employee.name}</td>
-                <td className="p-4">{employee.profession}</td>
-                <td className="p-4">{employee.email}</td>
-                <td className="p-4">{employee.phone || "-"}</td>
-                <td className="p-4">
-                  {employee.hourlyRate != null
-                    ? `${employee.hourlyRate.toFixed(2)} €`
-                    : "-"}
+                <td className="p-4 font-medium">
+                  {employee.firstName}
                 </td>
+
+                <td className="p-4 font-medium">
+                  {employee.lastName}
+                </td>
+
+                <td className="p-4">
+                  {employee.profession}
+                </td>
+
+                <td className="p-4">
+                  {employee.email}
+                </td>
+
+                <td className="p-4">
+                  {employee.phone || "-"}
+                </td>
+
+                <td className="p-4">
+                  {employee.employmentType === "HOURLY"
+                    ? "Stundenbasis"
+                    : "Fest angestellt"}
+                </td>
+
+                <td className="p-4">
+                  {employee.employmentType === "HOURLY" ? (
+                    employee.hourlyRate != null
+                      ? `${employee.hourlyRate.toFixed(2)} €`
+                      : "-"
+                  ) : (
+                    employee.contractedHoursPerDay != null
+                      ? `${employee.contractedHoursPerDay} Std/Tag`
+                      : "-"
+                  )}
+                </td>
+
               </tr>
             ))}
           </tbody>

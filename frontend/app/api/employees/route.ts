@@ -7,28 +7,34 @@ import { NextResponse } from "next/server"
 export async function GET() {
   try {
     const employees = await prisma.employee.findMany({
-      orderBy: {
-        name: "asc",
-      },
+      orderBy: [
+        { lastName: "asc" },
+        { firstName: "asc" },
+      ],
       include: {
         _count: {
           select: {
-            assignments: true, // ← nombre exacto de tu relación
+            assignments: true,
           },
         },
       },
     })
 
-    const formatted = employees.map(emp => ({
+    const formatted = employees.map((emp) => ({
       id: emp.id,
-      name: emp.name,
+      firstName: emp.firstName,
+      lastName: emp.lastName,
+      fullName: `${emp.firstName} ${emp.lastName}`,
       profession: emp.profession,
       email: emp.email,
       phone: emp.phone,
       hourlyRate: emp.hourlyRate,
+      employmentType: emp.employmentType,
+      contractedHoursPerDay: emp.contractedHoursPerDay,
       userId: emp.userId,
       hasLogin: !!emp.userId,
-      servicesCount: emp._count.assignments, // ← ahora sí existe
+      servicesCount: emp._count.assignments,
+      createdAt: emp.createdAt,
     }))
 
     return NextResponse.json(formatted)
@@ -49,7 +55,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
 
-    if (!body.name || !body.profession || !body.email) {
+    if (!body.firstName || !body.lastName || !body.profession || !body.email) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -58,17 +64,23 @@ export async function POST(req: Request) {
 
     const employee = await prisma.employee.create({
       data: {
-        name: body.name,
+        firstName: body.firstName,
+        lastName: body.lastName,
         profession: body.profession,
         email: body.email,
         phone: body.phone || null,
         hourlyRate: body.hourlyRate
           ? parseFloat(body.hourlyRate)
           : null,
+        employmentType: body.employmentType || "HOURLY",
+        contractedHoursPerDay: body.contractedHoursPerDay
+          ? parseFloat(body.contractedHoursPerDay)
+          : null,
       },
     })
 
     return NextResponse.json(employee)
+
   } catch (error) {
     console.error("EMPLOYEE CREATE ERROR:", error)
     return NextResponse.json(

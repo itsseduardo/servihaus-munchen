@@ -15,21 +15,17 @@ export default function ServiceDetailsModal({
 }: Props) {
 
   const [notes, setNotes] = useState(service.notes || "")
+  const [importantNotes, setImportantNotes] = useState(service.importantNotes || "")
   const [status, setStatus] = useState(service.status)
   const [loading, setLoading] = useState(false)
-
-  const statusMap: Record<string, string> = {
-    pending: "Geplant",
-    confirmed: "Bestätigt",
-    on_route: "Unterwegs",
-    completed: "Abgeschlossen",
-  }
+  const [actualStartTime, setActualStartTime] = useState<string>("")
+  const [actualEndTime, setActualEndTime] = useState<string>("")
 
   const statusColors: Record<string, string> = {
-    pending: "bg-amber-100 text-amber-800",
-    confirmed: "bg-emerald-100 text-emerald-800",
-    on_route: "bg-blue-100 text-blue-800",
-    completed: "bg-gray-200 text-gray-700",
+    assigned: "bg-blue-100 text-blue-800",
+    in_progress: "bg-yellow-100 text-yellow-800",
+    completed: "bg-green-100 text-green-800",
+    cancelled: "bg-red-100 text-red-800",
   }
 
   const handleSave = async () => {
@@ -41,8 +37,12 @@ export default function ServiceDetailsModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           notes,
+          importantNotes,
           status,
+          actualStartTime: actualStartTime || undefined,
+          actualEndTime: actualEndTime || undefined,
         }),
+        
       })
 
       if (!res.ok) {
@@ -80,21 +80,39 @@ export default function ServiceDetailsModal({
     }
   }
 
+  const handleStartNow = async () => {
+    try {
+      await fetch(`/api/services/${service.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actualStartTime: new Date(),
+          status: "in_progress",
+        }),
+      })
+
+      onUpdated?.()
+
+    } catch (err) {
+      console.error("Start error:", err)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
 
-      <div className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
         {/* HEADER */}
-        <header className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <header className="flex items-center justify-between border-b px-6 py-4">
           <div>
             <h2 className="text-xl font-bold">Auftragsdetails</h2>
-            <p className="text-sm text-slate-500">{service.code}</p>
+            <p className="text-sm text-slate-500">{service.serviceCode
+              ? `${service.serviceCode.code} - ${service.serviceCode.description}`
+            : "Kein Service-Typ"}</p>
           </div>
 
-          <button onClick={onClose}>
-            <span className="material-symbols-outlined">close</span>
-          </button>
+          <button onClick={onClose}>✕</button>
         </header>
 
         {/* CONTENT */}
@@ -103,25 +121,41 @@ export default function ServiceDetailsModal({
           {/* STATUS */}
           <section className="space-y-3">
             <span
-              className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
-                statusColors[status] || "bg-slate-100 text-slate-800"
-              }`}
+              className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${statusColors[status] || "bg-slate-100 text-slate-800"
+                }`}
             >
-              {statusMap[status] || status}
+              {status}
             </span>
 
-            <div>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="border rounded-lg p-2 text-sm"
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="border rounded-lg p-2 text-sm"
+            >
+              <option value="assigned">Geplant</option>
+              <option value="in_progress">In Arbeit</option>
+              <option value="completed">Abgeschlossen</option>
+              <option value="cancelled">Storniert</option>
+            </select>
+
+            {status !== "in_progress" && (
+              <button
+                onClick={async () => {
+                  await fetch(`/api/services / ${service.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      status: "in_progress",
+                      actualStartTime: new Date(),
+                    }),
+                  })
+
+                  window.location.reload()
+                }}
               >
-                <option value="pending">Geplant</option>
-                <option value="confirmed">Bestätigt</option>
-                <option value="on_route">Unterwegs</option>
-                <option value="completed">Abgeschlossen</option>
-              </select>
-            </div>
+                Jetzt starten
+              </button>
+            )}
           </section>
 
           {/* CLIENT */}
@@ -146,12 +180,8 @@ export default function ServiceDetailsModal({
             </div>
           </section>
 
-          {/* SERVICE DETAILS */}
+          {/* SERVICE INFO */}
           <section>
-            <h4 className="text-sm font-bold uppercase text-primary mb-3">
-              Service-Details
-            </h4>
-
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
 
               <div className="bg-slate-50 p-3 rounded-lg">
@@ -162,14 +192,16 @@ export default function ServiceDetailsModal({
               </div>
 
               <div className="bg-slate-50 p-3 rounded-lg">
-                <p className="text-xs uppercase text-slate-500">Uhrzeit</p>
-                <p className="font-bold">{service.time}</p>
+                <p className="text-xs uppercase text-slate-500">Startzeit</p>
+                <p className="font-bold">
+                  {service.time}
+                </p>
               </div>
 
               <div className="bg-slate-50 p-3 rounded-lg">
-                <p className="text-xs uppercase text-slate-500">Dauer</p>
-                <p className="font-bold text-primary">
-                  {service.duration || "—"}
+                <p className="text-xs uppercase text-slate-500">Geplante Dauer</p>
+                <p className="font-bold">
+                  {service.duration} h
                 </p>
               </div>
 
@@ -184,6 +216,39 @@ export default function ServiceDetailsModal({
 
             </div>
           </section>
+
+          {service.status === "in_progress" && (
+            <div className="space-y-4 mt-6">
+              <h3 className="font-semibold">Reale Startzeit</h3>
+
+              <input
+                type="datetime-local"
+                value={actualStartTime}
+                onChange={(e) => setActualStartTime(e.target.value)}
+                className="w-full h-12 rounded-lg border px-4"
+              />
+            </div>
+          )}
+
+          {service.status === "completed" && (
+            <div className="space-y-4 mt-6">
+              <h3 className="font-semibold">Reale Zeiten</h3>
+
+              <input
+                type="datetime-local"
+                value={actualStartTime}
+                onChange={(e) => setActualStartTime(e.target.value)}
+                className="w-full h-12 rounded-lg border px-4"
+              />
+
+              <input
+                type="datetime-local"
+                value={actualEndTime}
+                onChange={(e) => setActualEndTime(e.target.value)}
+                className="w-full h-12 rounded-lg border px-4"
+              />
+            </div>
+          )}
 
           {/* TEAM */}
           <section>
@@ -204,14 +269,11 @@ export default function ServiceDetailsModal({
                   >
                     <div>
                       <p className="font-semibold">
-                        {a.employee?.name}
+                        {a.employee?.firstName} {a.employee?.lastName}
                       </p>
                       <p className="text-xs text-slate-500">
                         {a.employee?.profession}
                       </p>
-                    </div>
-                    <div className="text-xs text-slate-400">
-                      {a.workedHours || 0}h
                     </div>
                   </div>
                 ))}
@@ -219,7 +281,20 @@ export default function ServiceDetailsModal({
             )}
           </section>
 
-          {/* NOTES */}
+          {/* IMPORTANT NOTES */}
+          <section>
+            <h4 className="text-sm font-bold uppercase text-red-600 mb-3">
+              Wichtige Notizen
+            </h4>
+
+            <textarea
+              value={importantNotes}
+              onChange={(e) => setImportantNotes(e.target.value)}
+              className="w-full h-24 p-4 rounded-xl border border-red-400 text-sm resize-none"
+            />
+          </section>
+
+          {/* NORMAL NOTES */}
           <section>
             <h4 className="text-sm font-bold uppercase text-primary mb-3">
               Interne Notizen
@@ -228,8 +303,7 @@ export default function ServiceDetailsModal({
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full h-32 p-4 rounded-xl border bg-slate-50 text-sm resize-none focus:ring-2 focus:ring-primary/50"
-              placeholder="Details oder spezielle Anweisungen hinzufügen..."
+              className="w-full h-32 p-4 rounded-xl border text-sm resize-none"
             />
           </section>
 
@@ -240,9 +314,8 @@ export default function ServiceDetailsModal({
 
           <button
             onClick={handleDelete}
-            className="flex items-center gap-2 text-rose-600 font-bold"
+            className="text-rose-600 font-bold"
           >
-            <span className="material-symbols-outlined">delete</span>
             Auftrag löschen
           </button>
 
@@ -266,6 +339,6 @@ export default function ServiceDetailsModal({
         </footer>
 
       </div>
-    </div>
+    </div >
   )
 }

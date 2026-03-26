@@ -21,7 +21,11 @@ export async function GET(
       include: {
         assignments: {
           include: {
-            service: true,
+            service: {
+              include: {
+                serviceCode: true,   // 👈 IMPORTANTE
+              },
+            },
           },
         },
       },
@@ -34,33 +38,46 @@ export async function GET(
       )
     }
 
-    let totalHours = 0
+    let totalWorkedHours = 0
+    let totalPaidHours = 0
 
     employee.assignments.forEach((assignment) => {
       const service = assignment.service
 
-      if (
-        service.startTime &&
-        service.actualEndTime &&
-        ["assigned", "completed", "cancelled"].includes(service.status)
-      ) {
-        const diff =
-          (new Date(service.actualEndTime).getTime() -
-            new Date(service.startTime).getTime()) /
+      if (service.status !== "completed") return
+      if (!service.duration) return
+
+      let workedHours = service.duration
+
+      if (service.actualStartTime && service.actualEndTime) {
+        const start = new Date(service.actualStartTime)
+        const end = new Date(service.actualEndTime)
+
+        const realDiff =
+          (end.getTime() - start.getTime()) /
           (1000 * 60 * 60)
 
-        totalHours += diff
+        if (realDiff > 0) {
+          workedHours = realDiff
+        }
       }
+
+      totalWorkedHours += workedHours
+
+      // Pago mínimo 1h y redondeo hacia arriba
+      const paidHours = Math.max(1, Math.ceil(workedHours))
+      totalPaidHours += paidHours
     })
 
     const totalEarnings =
       employee.hourlyRate != null
-        ? totalHours * employee.hourlyRate
+        ? totalPaidHours * employee.hourlyRate
         : 0
 
     return NextResponse.json({
       ...employee,
-      totalHours,
+      totalWorkedHours,
+      totalPaidHours,
       totalEarnings,
     })
 

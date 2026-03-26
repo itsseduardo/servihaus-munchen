@@ -14,6 +14,11 @@ enum Role {
   EMPLOYEE
 }
 
+enum EmploymentType {
+  FIXED
+  HOURLY
+}
+
 model User {
   id        String   @id @default(uuid())
   name      String
@@ -22,75 +27,90 @@ model User {
   role      Role     @default(EMPLOYEE)
   createdAt DateTime @default(now())
 
-  employee  Employee?
-}
-
-model Client {
-  id          Int       @id @default(autoincrement())
-  clientCode  String    @unique
-  name        String
-  address     String?
-  phone       String?
-  email       String?
-  services    Service[]
-  createdAt   DateTime  @default(now())
-}
-
-model Service {
-  id             Int       @id @default(autoincrement())
-  code           String    @unique
-  serviceType    String
-
-  date           DateTime  // lo dejamos por ahora
-  time           String     // lo dejamos por ahora
-  duration       String?    // lo dejamos por ahora
-
-  startTime      DateTime?  // NUEVO
-  actualEndTime  DateTime?  // NUEVO
-
-  address        String
-  status         String
-  requiresKey    Boolean    @default(false)
-  notes          String?
-
-  clientId       Int
-  client         Client     @relation(fields: [clientId], references: [id])
-
-  assignments    ServiceAssignment[]
-
-  createdAt      DateTime  @default(now())
+  employee Employee?
 }
 
 model Employee {
-  id          Int      @id @default(autoincrement())
-  name        String
-  profession  String
-  email       String   @unique
-  phone       String?
-  hourlyRate  Float?
+  id Int @id @default(autoincrement())
 
-  userId      String?  @unique
-  user        User?    @relation(fields: [userId], references: [id])
+  firstName String
+  lastName  String
+
+  profession String
+  email      String
+  phone      String?
+  hourlyRate Float?
+
+  employmentType        EmploymentType @default(HOURLY)
+  contractedHoursPerDay Float?
+
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  assignments ServiceAssignment[]
+}
+
+model Client {
+  id         Int      @id @default(autoincrement())
+  clientCode String   @unique
+  name       String
+  address    String?
+  phone      String?
+  email      String?
+  createdAt  DateTime @default(now())
+
+  services Service[]
+}
+
+model ServiceCode {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  description String
+  createdAt   DateTime @default(now())
+
+  services Service[]
+}
+
+model Service {
+  id   Int    @id @default(autoincrement())
+  code String?
+
+  serviceCodeId Int?
+  serviceCode   ServiceCode? @relation(fields: [serviceCodeId], references: [id])
+
+  date            DateTime
+  startTime       DateTime
+  actualStartTime DateTime?
+  actualEndTime   DateTime?
+
+  duration    Float?
+  address     String
+  status      String
+  requiresKey Boolean @default(false)
+
+  notes          String?
+  importantNotes String?
+
+  clientId Int
+  client   Client @relation(fields: [clientId], references: [id])
 
   assignments ServiceAssignment[]
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 }
 
 model ServiceAssignment {
-  id          Int      @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  serviceId   Int
-  employeeId  Int
+  serviceId  Int
+  employeeId Int
 
-  service     Service  @relation(fields: [serviceId], references: [id])
-  employee    Employee @relation(fields: [employeeId], references: [id])
+  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
-  workedHours Float?
-  notes       String?
-  status      String?  // assigned | completed
-
-  createdAt   DateTime @default(now())
+  assignedAt DateTime @default(now())
 
   @@unique([serviceId, employeeId])
 }

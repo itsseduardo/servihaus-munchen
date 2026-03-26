@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/prisma"
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
 export async function PUT(
-  req: NextRequest,
+  req: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -18,18 +18,93 @@ export async function PUT(
 
     const body = await req.json()
 
+    const service = await prisma.service.findUnique({
+      where: { id: serviceId },
+      include: {
+        serviceCode: true,
+        client: true,
+        assignments: {
+          include: {
+            employee: true,
+          }
+        }
+      }
+    })
+
+    if (!service) {
+      return NextResponse.json(
+        { error: "Service not found" },
+        { status: 404 }
+      )
+    }
+
     const updateData: any = {}
 
-    if (body.status) {
-      updateData.status = body.status
+    // ----------------------------
+    // STATUS TRANSITIONS CONTROLLED
+    // ----------------------------
 
-      if (body.status === "completed") {
-        updateData.actualEndTime = new Date()
+    if (body.status && body.status !== service.status) {
+      const newStatus = body.status
+
+      // INICIAR (opcional)
+      if (newStatus === "in_progress") {
+        updateData.status = "in_progress"
+
+        // Si frontend no manda hora real, usar ahora
+        updateData.actualStartTime =
+          body.actualStartTime
+            ? new Date(body.actualStartTime)
+            : new Date()
       }
+
+      // COMPLETAR (permitido desde cualquier estado)
+      if (newStatus === "completed") {
+        updateData.status = "completed"
+
+        // Si mandan hora real, usarla
+        if (body.actualEndTime) {
+          updateData.actualEndTime = new Date(body.actualEndTime)
+        } else {
+          // Si nunca se inició, usar duración planificada
+          if (!service.actualStartTime) {
+            updateData.actualStartTime = service.startTime
+          }
+
+          updateData.actualEndTime = new Date(
+            service.startTime.getTime() +
+            (service.duration ?? 0) * 60 * 60 * 1000
+          )
+        }
+
+      }
+      
+      if (newStatus === "cancelled") {
+        updateData.status = "cancelled"
+        updateData.actualStartTime = null
+        updateData.actualEndTime = null
+      }
+
     }
+
+    if (body.actualStartTime) {
+      updateData.actualStartTime = new Date(body.actualStartTime)
+    }
+
+    if (body.actualEndTime) {
+      updateData.actualEndTime = new Date(body.actualEndTime)
+    }
+
+    // ----------------------------
+    // NOTAS
+    // ----------------------------
 
     if (body.notes !== undefined) {
       updateData.notes = body.notes
+    }
+
+    if (body.importantNotes !== undefined) {
+      updateData.importantNotes = body.importantNotes
     }
 
     const updated = await prisma.service.update({
@@ -49,19 +124,12 @@ export async function PUT(
 }
 
 export async function DELETE(
-  req: NextRequest,
+  req: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await context.params
     const serviceId = parseInt(id)
-
-    if (isNaN(serviceId)) {
-      return NextResponse.json(
-        { error: "Invalid service id" },
-        { status: 400 }
-      )
-    }
 
     await prisma.serviceAssignment.deleteMany({
       where: { serviceId },
