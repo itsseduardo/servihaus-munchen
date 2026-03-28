@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import EmployeeSelector from "./EmployeeSelector"
 
 interface Props {
   selectedDate: string
@@ -28,8 +29,8 @@ export default function CreateServiceModal({
   // =========================
   // SERVICE STATES
   // =========================
-  
-  
+
+
   const [time, setTime] = useState(selectedTime)
   const [duration, setDuration] = useState<number | "">("")
   const [requiresKey, setRequiresKey] = useState(false)
@@ -158,7 +159,7 @@ export default function CreateServiceModal({
   }
 
 
-  
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
       <div className="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
@@ -233,7 +234,7 @@ export default function CreateServiceModal({
 
           {/* SERVICE SECTION */}
           <section className="grid grid-cols-1 gap-4">
-            
+
             <select
               value={selectedServiceCodeId ?? ""}
               onChange={(e) =>
@@ -242,117 +243,92 @@ export default function CreateServiceModal({
                 )
               }
               className="h-12 rounded-lg border px-4"
-              >
-            <option value="">Service auswählen</option>
-            {serviceCodes.map((code) => (
-              <option key={code.id} value={code.id}>
-                {code.code} – {code.description}
-              </option>
-            ))}
-          </select>
+            >
+              <option value="">Service auswählen</option>
+              {serviceCodes.map((code) => (
+                <option key={code.id} value={code.id}>
+                  {code.code} – {code.description}
+                </option>
+              ))}
+            </select>
 
-          <input
-            type="number"
-            step="0.5"
-            placeholder="Dauer (Stunden)"
-            value={duration}
-            onChange={(e) =>
-              setDuration(e.target.value === "" ? "" : Number(e.target.value))
-            }
-            className="h-12 rounded-lg border px-4"
-          />
+            <input
+              type="number"
+              step="0.5"
+              placeholder="Dauer (Stunden)"
+              value={duration}
+              onChange={(e) =>
+                setDuration(e.target.value === "" ? "" : Number(e.target.value))
+              }
+              className="h-12 rounded-lg border px-4"
+            />
 
-          <input
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            className="h-12 rounded-lg border px-4"
-          />
-        </section>
+            <input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              className="h-12 rounded-lg border px-4"
+            />
+          </section>
 
-        {/* EMPLOYEES */}
-        <section className="space-y-3">
-          <h3 className="text-xs font-bold uppercase text-primary">
-            Mitarbeiter zuweisen
-          </h3>
+          {/* EMPLOYEES */}
+          <section className="space-y-3">
+            <h3 className="text-xs font-bold uppercase text-primary">
+              Mitarbeiter zuweisen
+            </h3>
 
-          <div className="grid grid-cols-2 gap-3">
-            {employees.map((emp) => (
-              <label
-                key={emp.id}
-                className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedEmployees.includes(emp.id)}
-                  onChange={() => {
-                    if (selectedEmployees.includes(emp.id)) {
-                      setSelectedEmployees(
-                        selectedEmployees.filter((id) => id !== emp.id)
-                      )
-                    } else {
-                      setSelectedEmployees([...selectedEmployees, emp.id])
-                    }
-                  }}
-                />
-                <div>
-                  <div className="font-medium">
-                    {emp.firstName} {emp.lastName}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {emp.profession}
-                  </div>
-                </div>
-              </label>
-            ))}
-          </div>
-        </section>
+            <EmployeeSelector
+              employees={employees}
+              selected={selectedEmployees}
+              onChange={setSelectedEmployees}
+            />
+          </section>
 
-        {/* NOTES */}
-        <section className="space-y-4">
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Notizen"
-            className="w-full h-24 rounded-lg border p-4"
-          />
+          {/* NOTES */}
+          <section className="space-y-4">
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Notizen"
+              className="w-full h-24 rounded-lg border p-4"
+            />
 
-          <textarea
-            value={importantNotes}
-            onChange={(e) => setImportantNotes(e.target.value)}
-            placeholder="Wichtige Notizen (werden im Kalender angezeigt)"
-            className="w-full h-24 rounded-lg border p-4 border-red-400"
-          />
-        </section>
+            <textarea
+              value={importantNotes}
+              onChange={(e) => setImportantNotes(e.target.value)}
+              placeholder="Wichtige Notizen (werden im Kalender angezeigt)"
+              className="w-full h-24 rounded-lg border p-4 border-red-400"
+            />
+          </section>
 
-        {/* KEY */}
-        <section className="flex justify-between items-center bg-primary/5 p-4 rounded-xl">
-          <span className="font-semibold">Schlüssel erforderlich</span>
-          <input
-            type="checkbox"
-            checked={requiresKey}
-            onChange={(e) => setRequiresKey(e.target.checked)}
-          />
-        </section>
+          {/* KEY */}
+          <section className="flex justify-between items-center bg-primary/5 p-4 rounded-xl">
+            <span className="font-semibold">Schlüssel erforderlich</span>
+            <input
+              type="checkbox"
+              checked={requiresKey}
+              onChange={(e) => setRequiresKey(e.target.checked)}
+            />
+          </section>
+
+        </div>
+
+        {/* FOOTER */}
+        <div className="px-8 py-6 border-t flex justify-end gap-3">
+          <button onClick={onClose} className="px-6 h-12 rounded-lg border">
+            Abbrechen
+          </button>
+
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="px-8 h-12 rounded-lg bg-primary text-white"
+          >
+            {loading ? "Speichern..." : "Auftrag speichern"}
+          </button>
+        </div>
 
       </div>
-
-      {/* FOOTER */}
-      <div className="px-8 py-6 border-t flex justify-end gap-3">
-        <button onClick={onClose} className="px-6 h-12 rounded-lg border">
-          Abbrechen
-        </button>
-
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="px-8 h-12 rounded-lg bg-primary text-white"
-        >
-          {loading ? "Speichern..." : "Auftrag speichern"}
-        </button>
-      </div>
-
-    </div>
     </div >
   )
 }
