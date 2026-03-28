@@ -71,14 +71,16 @@ export async function PUT(
             updateData.actualStartTime = service.startTime
           }
 
-          updateData.actualEndTime = new Date(
-            service.startTime.getTime() +
-            (service.duration ?? 0) * 60 * 60 * 1000
-          )
+          if (service.startTime) {
+            updateData.actualEndTime = new Date(
+              service.startTime.getTime() +
+              (service.duration ?? 0) * 60 * 60 * 1000
+            )
+          }
         }
 
       }
-      
+
       if (newStatus === "cancelled") {
         updateData.status = "cancelled"
         updateData.actualStartTime = null
