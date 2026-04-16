@@ -26,10 +26,15 @@ model Employee {
   hourlyRate            Float?
   userId                String?  @unique
   createdAt             DateTime @default(now())
-  contractedHoursPerDay Float?
+  contractedHoursPerWeek Float?
+  vacationDaysPerYear   Int?
+  active                Boolean         @default(true)
   employmentType        EmploymentType?
   firstName             String
   lastName              String
+
+  auditLogs             AuditLog[]
+  timeBlocks            TimeBlock[]
 
   user        User? @relation(fields: [userId], references: [id])
   assignments ServiceAssignment[]
@@ -45,29 +50,62 @@ model Client {
   address    String?
   category   ClientCategory @default(C)
 
+  clientType    ClientType     @default(PRIVAT) // PRIVAT o FIRMA
+
   services Service[]
 }
 
 model Service {
-  id             Int      @id @default(autoincrement())
-  code           String?
-  date           DateTime
-  address        String
-  status         String
-  requiresKey    Boolean  @default(false)
-  notes          String?
-  clientId       Int
-  createdAt      DateTime @default(now())
-  actualEndTime  DateTime?
-  startTime      DateTime?
-  actualStartTime DateTime?
-  importantNotes String?
-  serviceCodeId  Int?
-  duration       Float?
-  serviceCode ServiceCode? @relation(fields: [serviceCodeId], references: [id])
+  id                Int       @id @default(autoincrement())
 
-  client      Client   @relation(fields: [clientId], references: [id])
-  assignments ServiceAssignment[]
+  code              String?
+  date              DateTime
+  address           String
+  status            String
+  requiresKey       Boolean   @default(false)
+  notes             String?
+  importantNotes    String?
+
+  clientId          Int
+  createdAt         DateTime  @default(now())
+
+  startTime         DateTime?
+  actualStartTime   DateTime?
+  actualEndTime     DateTime?
+
+  // NUEVO
+  billedHours       Float?     // Lo que el cliente paga
+  teamDuration      Float?     // Tiempo real que ocupa en calendario
+  pricingModel      PricingModel @default(TIME)
+
+  travelTime      Int?        @default(0)   // Tiempo de desplazamiento en minutos
+  changeReason    String?                   // Justificación legal de edición manual
+
+  //  Temporal (lo elimino luego)
+  duration          Float?
+
+  serviceCodeId     Int?
+  serviceCode       ServiceCode? @relation(fields: [serviceCodeId], references: [id])
+
+  client            Client     @relation(fields: [clientId], references: [id])
+  assignments       ServiceAssignment[]
+
+  // =========================
+  // RECURRENCIA
+  // =========================
+  recurrenceRule     String?    // DAILY, WEEKLY, BIWEEKLY, MONTHLY
+  recurrenceInterval Int?       // cada cuántas unidades (1 = cada semana, 2 = cada 2 semanas)
+  recurrenceEnd      DateTime?  // fecha límite
+  recurrenceDays     String[] @db.Text
+  parentServiceId    Int?
+
+  parentService Service? @relation("Recurrence", fields: [parentServiceId], references: [id])
+  childServices Service[] @relation("Recurrence")
+}
+
+enum PricingModel {
+  TIME
+  FIXED
 }
 
 model ServiceAssignment {
@@ -90,6 +128,40 @@ model ServiceCode {
   services    Service[]
 }
 
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  action      String   // "UPDATE_HOURS", "DELETE_SERVICE", etc.
+  entityId    Int      // ID del servicio o empleado afectado
+  entityType  String   // "SERVICE" o "EMPLOYEE"
+  userId      String   // Quién hizo el cambio (ID de User)
+  oldValue    String?  @db.Text
+  newValue    String?  @db.Text
+  reason      String?  @db.Text // El "changeReason" que pedimos en el modal
+  createdAt   DateTime @default(now())
+  
+  employee    Employee? @relation(fields: [employeeId], references: [id])
+  employeeId  Int?
+}
+
+model TimeBlock {
+  id            Int            @id @default(autoincrement())
+  employeeId    Int
+  date          DateTime
+  duration      Float          // Horas a computar
+  type          TimeBlockType  // VACATION, SICK, CLIENT_CANCELLED, PAID_LEAVE
+  reason        String?        // Nota aclaratoria
+  createdAt     DateTime       @default(now())
+
+  employee      Employee       @relation(fields: [employeeId], references: [id])
+}
+
+enum TimeBlockType {
+  VACATION
+  SICK
+  CLIENT_CANCELLED
+  PAID_LEAVE
+}
+
 enum Role {
   ADMIN
   ACCOUNTANT
@@ -97,8 +169,14 @@ enum Role {
 }
 
 enum EmploymentType {
-  HOURLY
-  FIXED
+  MINIJOB_538 // El límite actual en Alemania
+  MIDIJOB
+  FULL_TIME
+}
+
+enum ClientType {
+  PRIVAT
+  FIRMA
 }
 
 enum ClientCategory {

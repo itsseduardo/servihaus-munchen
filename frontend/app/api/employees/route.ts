@@ -13,9 +13,7 @@ export async function GET() {
       ],
       include: {
         _count: {
-          select: {
-            assignments: true,
-          },
+          select: { assignments: true },
         },
       },
     })
@@ -30,7 +28,9 @@ export async function GET() {
       phone: emp.phone,
       hourlyRate: emp.hourlyRate,
       employmentType: emp.employmentType,
-      contractedHoursPerDay: emp.contractedHoursPerDay,
+      // Cambiamos a la lógica semanal que pidió José
+      contractedHoursPerWeek: emp.contractedHoursPerWeek, 
+      vacationDaysPerYear: emp.vacationDaysPerYear,
       userId: emp.userId,
       hasLogin: !!emp.userId,
       servicesCount: emp._count.assignments,
@@ -69,13 +69,15 @@ export async function POST(req: Request) {
         profession: body.profession,
         email: body.email,
         phone: body.phone || null,
-        hourlyRate: body.hourlyRate
-          ? parseFloat(body.hourlyRate)
+        hourlyRate: body.hourlyRate ? parseFloat(body.hourlyRate) : null,
+        // Usamos los nuevos enums legales
+        employmentType: body.employmentType || "MINIJOB_538", 
+        contractedHoursPerWeek: body.contractedHoursPerWeek 
+          ? parseFloat(body.contractedHoursPerWeek) 
           : null,
-        employmentType: body.employmentType || "HOURLY",
-        contractedHoursPerDay: body.contractedHoursPerDay
-          ? parseFloat(body.contractedHoursPerDay)
-          : null,
+        vacationDaysPerYear: body.vacationDaysPerYear 
+          ? parseInt(body.vacationDaysPerYear) 
+          : 20, // Mínimo legal por defecto
       },
     })
 

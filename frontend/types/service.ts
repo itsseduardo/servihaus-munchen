@@ -1,4 +1,5 @@
 export type ServiceType = {
+  [x: string]: any
   serviceCode: any
   id: number
   code: string

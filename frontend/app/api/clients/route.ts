@@ -25,9 +25,13 @@ export async function GET(req: Request) {
             ],
           }
         : undefined,
-      orderBy: {
-        name: "asc",
-      },
+      // REQUISITO JOSÉ: Orden jerárquico doble
+      // 1. Primero por Categoría (A, B, C...)
+      // 2. Luego por Código de cliente (108, 109, 110...)
+      orderBy: [
+        { category: "asc" },
+        { clientCode: "asc" },
+      ],
     })
 
     return NextResponse.json(clients)
@@ -42,7 +46,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
 
-    const { clientCode, name, address, email, phone } = body
+    const { clientCode, name, address, email, phone, category, clientType } = body
 
     if (!clientCode || !name) {
       return NextResponse.json(
@@ -69,6 +73,9 @@ export async function POST(req: Request) {
         address: address || null,
         email: email || null,
         phone: phone || null,
+        //  NUEVOS CAMPOS: Categoría y Tipo (Particular/Empresa)
+        category: category || "C",
+        clientType: clientType || "PRIVAT", 
       },
     })
 

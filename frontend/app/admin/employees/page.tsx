@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import CreateEmployeeModal from "@/components/admin/CreateEmployeeModal"
 
+
 interface Employee {
   id: number
   firstName: string
@@ -12,33 +13,31 @@ interface Employee {
   email: string
   phone: string | null
   hourlyRate: number | null
-  employmentType: "HOURLY" | "FIXED"
-  contractedHoursPerDay: number | null
+  employmentType: "MINIJOB_538" | "MIDIJOB" | "FULL_TIME"
+  contractedHoursPerWeek: number | null
+  vacationDaysPerYear: number | null
 }
 
 export default function AdminEmployeesPage() {
-
   const router = useRouter()
 
   const [employees, setEmployees] = useState<Employee[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  // PAGINATION
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 8
+
 
   const fetchEmployees = async () => {
     try {
       const res = await fetch("/api/employees")
       const data = await res.json()
-
       if (Array.isArray(data)) {
         setEmployees(data)
       } else {
         setEmployees([])
       }
-
     } catch {
       setEmployees([])
     } finally {
@@ -55,18 +54,17 @@ export default function AdminEmployeesPage() {
     router.refresh()
   }
 
-  // STATS
+  // MÉTRICAS SOLICITADAS POR JOSÉ
   const stats = useMemo(() => {
-    const total = employees.length
-    const hourly = employees.filter(e => e.employmentType === "HOURLY").length
-    const fixed = employees.filter(e => e.employmentType === "FIXED").length
-
-    return { total, hourly, fixed }
+    return {
+      total: employees.length,
+      minijob: employees.filter(e => e.employmentType === "MINIJOB_538").length,
+      midijob: employees.filter(e => e.employmentType === "MIDIJOB").length,
+      fulltime: employees.filter(e => e.employmentType === "FULL_TIME").length,
+    }
   }, [employees])
 
-  // PAGINATION LOGIC
   const totalPages = Math.ceil(employees.length / itemsPerPage)
-
   const paginatedEmployees = employees.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -74,133 +72,123 @@ export default function AdminEmployeesPage() {
 
   if (loading) {
     return (
-      <div className="p-10">
-        <p>Loading employees...</p>
+      <div className="p-10 flex flex-col items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+        <p className="text-slate-500 font-medium">Mitarbeiter werden geladen...</p>
       </div>
     )
   }
 
   return (
-    <div className="p-10 space-y-10">
+    <div className="p-10 space-y-10 bg-slate-50/30 min-h-screen">
 
       {/* HEADER */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-end">
         <div>
-          <h1 className="text-4xl font-black tracking-tight">
+          <h1 className="text-4xl font-black tracking-tight text-slate-900">
             Mitarbeiterverwaltung
           </h1>
-          <p className="text-slate-500 mt-2">
-            {stats.total} Mitarbeiter insgesamt
+          <p className="text-slate-500 mt-2 font-medium">
+            Zentrales Register für Arbeitsverträge & Stundenkonten
           </p>
         </div>
 
         <button
           onClick={() => setIsOpen(true)}
-          className="px-6 py-3 bg-primary text-white rounded-xl shadow hover:shadow-lg transition"
+          className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95"
         >
           + Neuer Mitarbeiter
         </button>
       </div>
 
-      {/* KPI CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-        <div className="bg-white p-6 rounded-2xl border shadow-sm">
-          <p className="text-xs font-bold uppercase text-slate-500">
-            Gesamt
-          </p>
-          <p className="text-3xl font-black mt-2">
-            {stats.total}
-          </p>
+      {/* KPI CARDS - DINÁMICAS SEGÚN CONTRATO */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+          <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Gesamt</p>
+          <p className="text-4xl font-black mt-2 text-center text-slate-800">{stats.total}</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border shadow-sm">
-          <p className="text-xs font-bold uppercase text-slate-500">
-            Stundenbasis
-          </p>
-          <p className="text-3xl font-black mt-2 text-blue-600">
-            {stats.hourly}
-          </p>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+          <p className="text-[10px] font-black uppercase text-blue-500 tracking-widest text-center">Minijob (538€)</p>
+          <p className="text-4xl font-black mt-2 text-center text-blue-600">{stats.minijob}</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border shadow-sm">
-          <p className="text-xs font-bold uppercase text-slate-500">
-            Fest angestellt
-          </p>
-          <p className="text-3xl font-black mt-2 text-emerald-600">
-            {stats.fixed}
-          </p>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+          <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest text-center">Midijob</p>
+          <p className="text-4xl font-black mt-2 text-center text-amber-600">{stats.midijob}</p>
         </div>
 
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+          <p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest text-center">Vollzeit</p>
+          <p className="text-4xl font-black mt-2 text-center text-emerald-600">{stats.fulltime}</p>
+        </div>
       </div>
 
       {/* TABLE */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-slate-50 text-slate-600 text-xs uppercase tracking-wider">
-              <th className="px-8 py-4 text-left">Vorname</th>
-              <th className="px-8 py-4 text-left">Nachname</th>
-              <th className="px-8 py-4 text-left">Profession</th>
-              <th className="px-8 py-4 text-left">Email</th>
-              <th className="px-8 py-4 text-left">Telefon</th>
-              <th className="px-8 py-4 text-left">Anstellungsart</th>
-              <th className="px-8 py-4 text-left">Rate / Stunden</th>
+            <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b">
+              {/* Columnas Separadas */}
+              <th className="px-8 py-5 text-left">Vorname</th>
+              <th className="px-8 py-5 text-left">Nachname</th>
+              <th className="px-8 py-5 text-left">Profession</th>
+              <th className="px-8 py-5 text-left">Kontakt</th>
+              <th className="px-8 py-5 text-left">Vertragstyp</th>
+              <th className="px-8 py-5 text-left text-blue-600">Wochenstunden</th>
+              <th className="px-8 py-5 text-right">Lohn</th>
             </tr>
           </thead>
 
-          <tbody>
+          <tbody className="divide-y divide-slate-100">
             {paginatedEmployees.map((employee) => (
               <tr
                 key={employee.id}
-                className="border-b border-slate-100 hover:bg-slate-50 transition cursor-pointer"
-                onClick={() =>
-                  router.push(`/admin/employees/${employee.id}`)
-                }
+                className="hover:bg-slate-50/50 transition-colors cursor-pointer group"
+                onClick={() => router.push(`/admin/employees/${employee.id}`)}
               >
-                <td className="px-8 py-5 font-medium">
-                  {employee.firstName}
+                {/*  Celda de Nombre con Avatar */}
+                <td className="px-8 py-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-400 text-[10px] group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors shrink-0">
+                      {employee.firstName[0]}{employee.lastName[0]}
+                    </div>
+                    <span className="font-bold text-slate-800">{employee.firstName}</span>
+                  </div>
                 </td>
 
-                <td className="px-8 py-5 font-medium">
+                {/* Celda de Apellido Independiente */}
+                <td className="px-8 py-5 font-bold text-slate-800">
                   {employee.lastName}
+                  <p className="text-[9px] text-slate-400 font-medium">ID: #{employee.id.toString().padStart(3, '0')}</p>
                 </td>
 
                 <td className="px-8 py-5">
-                  {employee.profession}
+                  <span className="font-medium text-slate-600">{employee.profession}</span>
                 </td>
 
                 <td className="px-8 py-5">
-                  {employee.email}
+                  <p className="text-slate-600 font-medium">{employee.email}</p>
+                  <p className="text-xs text-slate-400">{employee.phone || "-"}</p>
                 </td>
 
                 <td className="px-8 py-5">
-                  {employee.phone || "-"}
-                </td>
-
-                <td className="px-8 py-5">
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    employee.employmentType === "HOURLY"
-                      ? "bg-blue-100 text-blue-800"
-                      : "bg-emerald-100 text-emerald-800"
-                  }`}>
-                    {employee.employmentType === "HOURLY"
-                      ? "Stundenbasis"
-                      : "Fest angestellt"}
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${employee.employmentType === "MINIJOB_538" ? "bg-blue-100 text-blue-700" :
+                      employee.employmentType === "MIDIJOB" ? "bg-amber-100 text-amber-700" :
+                        "bg-emerald-100 text-emerald-700"
+                    }`}>
+                    {employee.employmentType === "MINIJOB_538" ? "Minijob" :
+                      employee.employmentType === "MIDIJOB" ? "Midijob" : "Vollzeit"}
                   </span>
                 </td>
 
-                <td className="px-8 py-5">
-                  {employee.employmentType === "HOURLY"
-                    ? employee.hourlyRate != null
-                      ? `${employee.hourlyRate.toFixed(2)} €`
-                      : "-"
-                    : employee.contractedHoursPerDay != null
-                      ? `${employee.contractedHoursPerDay} Std/Tag`
-                      : "-"
-                  }
+                <td className="px-8 py-5 font-black text-blue-600">
+                  {employee.contractedHoursPerWeek ? `${employee.contractedHoursPerWeek}h` : "-"}
                 </td>
 
+                <td className="px-8 py-5 text-right font-bold text-slate-700">
+                  {employee.hourlyRate ? `${employee.hourlyRate.toFixed(2)} €/h` : "-"}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -210,40 +198,32 @@ export default function AdminEmployeesPage() {
       {/* PAGINATION */}
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2">
-
           <button
             disabled={currentPage === 1}
             onClick={() => setCurrentPage((p) => p - 1)}
-            className="px-3 py-2 text-sm rounded-lg border disabled:opacity-40"
+            className="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"
           >
             ←
           </button>
-
-          {Array.from({ length: totalPages }).map((_, i) => {
-            const page = i + 1
-            return (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`px-3 py-2 text-sm rounded-lg border ${
-                  currentPage === page
-                    ? "bg-primary text-white border-primary"
-                    : "hover:bg-slate-100"
+          {Array.from({ length: totalPages }).map((_, i) => (
+            <button
+              key={i + 1}
+              onClick={() => setCurrentPage(i + 1)}
+              className={`w-10 h-10 rounded-xl font-bold text-sm transition-all ${currentPage === i + 1
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20"
+                  : "bg-white border border-slate-200 text-slate-500 hover:bg-slate-50"
                 }`}
-              >
-                {page}
-              </button>
-            )
-          })}
-
+            >
+              {i + 1}
+            </button>
+          ))}
           <button
             disabled={currentPage === totalPages}
             onClick={() => setCurrentPage((p) => p + 1)}
-            className="px-3 py-2 text-sm rounded-lg border disabled:opacity-40"
+            className="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"
           >
             →
           </button>
-
         </div>
       )}
 
@@ -253,7 +233,6 @@ export default function AdminEmployeesPage() {
           onCreated={handleCreated}
         />
       )}
-
     </div>
   )
 }
