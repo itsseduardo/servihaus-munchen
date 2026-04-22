@@ -17,15 +17,19 @@ export default function CreateEmployeeModal({
   const [profession, setProfession] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
+  
+  // NUEVO: El estado para la contraseña
+  const [password, setPassword] = useState("") 
+
   const [hourlyRate, setHourlyRate] = useState("")
-  // 🔥 Actualizado a Enums legales
   const [employmentType, setEmploymentType] = useState("MINIJOB_538")
   const [contractedHoursPerWeek, setContractedHoursPerWeek] = useState("")
   const [vacationDaysPerYear, setVacationDaysPerYear] = useState("20")
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async () => {
-    if (!firstName || !lastName || !profession || !email) return
+    // Validamos que la contraseña también esté presente
+    if (!firstName || !lastName || !profession || !email || !password) return
 
     try {
       setLoading(true)
@@ -39,9 +43,9 @@ export default function CreateEmployeeModal({
           profession,
           email,
           phone,
+          password, // NUEVO: Enviamos la contraseña al backend
           hourlyRate: hourlyRate ? Number(hourlyRate) : null,
           employmentType,
-          // 🔥 Ahora enviamos horas semanales y vacaciones
           contractedHoursPerWeek: contractedHoursPerWeek ? Number(contractedHoursPerWeek) : null,
           vacationDaysPerYear: Number(vacationDaysPerYear),
         }),
@@ -71,7 +75,7 @@ export default function CreateEmployeeModal({
               Neuer Mitarbeiter
             </h2>
             <p className="text-sm text-slate-500 font-medium">
-              Gesetzliche Vertragskonfiguration (Arbeitszeitgesetz)
+              Gesetzliche Vertragskonfiguration & Systemzugang
             </p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">✕</button>
@@ -94,18 +98,25 @@ export default function CreateEmployeeModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Email</label>
-              <input className="h-11 w-full rounded-xl border dark:border-slate-700 dark:bg-slate-900 px-4 text-sm outline-none" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Email (Login)</label>
+              <input type="email" className="h-11 w-full rounded-xl border dark:border-slate-700 dark:bg-slate-900 px-4 text-sm outline-none focus:ring-2 focus:ring-blue-600" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Telefon</label>
-              <input className="h-11 w-full rounded-xl border dark:border-slate-700 dark:bg-slate-900 px-4 text-sm outline-none" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <input className="h-11 w-full rounded-xl border dark:border-slate-700 dark:bg-slate-900 px-4 text-sm outline-none focus:ring-2 focus:ring-blue-600" value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Profession / Rolle</label>
-            <input className="h-11 w-full rounded-xl border dark:border-slate-700 dark:bg-slate-900 px-4 text-sm outline-none" value={profession} onChange={(e) => setProfession(e.target.value)} />
+          {/* NUEVO: ZONA DE CONTRASEÑA */}
+          <div className="grid grid-cols-2 gap-4 bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30">
+             <div className="space-y-1">
+              <label className="text-[10px] font-bold text-blue-600 uppercase ml-1">Start-Passwort</label>
+              <input type="text" placeholder="z.B. Servihaus2026!" className="h-11 w-full rounded-xl border border-blue-200 dark:border-blue-800 dark:bg-slate-900 px-4 text-sm outline-none focus:ring-2 focus:ring-blue-600" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Profession / Rolle</label>
+              <input className="h-11 w-full rounded-xl border dark:border-slate-700 dark:bg-slate-900 px-4 text-sm outline-none focus:ring-2 focus:ring-blue-600" value={profession} onChange={(e) => setProfession(e.target.value)} />
+            </div>
           </div>
 
           <hr className="dark:border-slate-800" />
@@ -118,14 +129,14 @@ export default function CreateEmployeeModal({
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Vertragstyp</label>
                 <select className="h-11 w-full rounded-xl border dark:border-slate-700 dark:bg-slate-900 px-4 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-600" value={employmentType} onChange={(e) => setEmploymentType(e.target.value)}>
-                  <option value="MINIJOB_538">Minijob (538€)</option>
+                  <option value="MINIJOB_603">Minijob (603€)</option>
                   <option value="MIDIJOB">Midijob</option>
                   <option value="FULL_TIME">Vollzeit / Teilzeit</option>
                 </select>
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Stundenlohn (€)</label>
-                <input type="number" step="0.5" className="h-11 w-full rounded-xl border dark:border-slate-700 dark:bg-slate-900 px-4 text-sm font-bold" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
+                <input type="number" step="0.5" className="h-11 w-full rounded-xl border dark:border-slate-700 dark:bg-slate-900 px-4 text-sm font-bold focus:ring-2 focus:ring-blue-600 outline-none" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
               </div>
             </div>
 
@@ -136,7 +147,7 @@ export default function CreateEmployeeModal({
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Urlaubstage (Jahr)</label>
-                <input type="number" className="h-11 w-full rounded-xl border dark:border-slate-700 dark:bg-slate-900 px-4 text-sm" value={vacationDaysPerYear} onChange={(e) => setVacationDaysPerYear(e.target.value)} />
+                <input type="number" className="h-11 w-full rounded-xl border dark:border-slate-700 dark:bg-slate-900 px-4 text-sm focus:ring-2 focus:ring-blue-600 outline-none" value={vacationDaysPerYear} onChange={(e) => setVacationDaysPerYear(e.target.value)} />
               </div>
             </div>
           </div>
@@ -147,7 +158,7 @@ export default function CreateEmployeeModal({
           <button onClick={onClose} className="px-6 py-2.5 rounded-xl border dark:border-slate-700 font-bold text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition">
             Abbrechen
           </button>
-          <button onClick={handleSubmit} disabled={loading} className="px-10 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition disabled:opacity-50 active:scale-95">
+          <button onClick={handleSubmit} disabled={loading || !password} className="px-10 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition disabled:opacity-50 active:scale-95">
             {loading ? "Speichern..." : "Mitarbeiter anlegen"}
           </button>
         </div>

@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
+import bcrypt from "bcryptjs" 
 
 // ======================
-// GET - Obtener empleados
+// GET - Obtener empleados (Intacto)
 // ======================
 export async function GET() {
   try {
@@ -28,7 +29,6 @@ export async function GET() {
       phone: emp.phone,
       hourlyRate: emp.hourlyRate,
       employmentType: emp.employmentType,
-      // Cambiamos a la lógica semanal que pidió José
       contractedHoursPerWeek: emp.contractedHoursPerWeek, 
       vacationDaysPerYear: emp.vacationDaysPerYear,
       userId: emp.userId,
@@ -49,39 +49,70 @@ export async function GET() {
 }
 
 // ======================
-// POST - Crear empleado
+// POST - Crear empleado (Actualizado con Login)
 // ======================
 export async function POST(req: Request) {
   try {
     const body = await req.json()
 
-    if (!body.firstName || !body.lastName || !body.profession || !body.email) {
+    //   Validamos que también envíen la contraseña
+    if (!body.firstName || !body.lastName || !body.profession || !body.email || !body.password) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       )
     }
 
-    const employee = await prisma.employee.create({
+    //  Verificamos que el email no exista en la tabla User
+    const existingUser = await prisma.user.findUnique({ where: { email: body.email } })
+    if (existingUser) {
+      return NextResponse.json(
+        { error: "El correo ya está registrado en el sistema" }, 
+        { status: 400 }
+      )
+    }
+
+    //   Encriptamos la contraseña y armamos el nombre completo
+    const hashedPassword = await bcrypt.hash(body.password, 10)
+    const fullName = `${body.firstName} ${body.lastName}`
+
+    //  Creación Anidada (User + Employee) conservando tu lógica de parsing
+    const newUserAndEmployee = await prisma.user.create({
       data: {
-        firstName: body.firstName,
-        lastName: body.lastName,
-        profession: body.profession,
+        name: fullName,
         email: body.email,
-        phone: body.phone || null,
-        hourlyRate: body.hourlyRate ? parseFloat(body.hourlyRate) : null,
-        // Usamos los nuevos enums legales
-        employmentType: body.employmentType || "MINIJOB_538", 
-        contractedHoursPerWeek: body.contractedHoursPerWeek 
-          ? parseFloat(body.contractedHoursPerWeek) 
-          : null,
-        vacationDaysPerYear: body.vacationDaysPerYear 
-          ? parseInt(body.vacationDaysPerYear) 
-          : 20, // Mínimo legal por defecto
+        password: hashedPassword,
+        role: "EMPLOYEE",
+        
+        // Creamos al empleado asociado en el mismo paso
+        employee: {
+          create: {
+            firstName: body.firstName,
+            lastName: body.lastName,
+            profession: body.profession,
+            email: body.email,
+            phone: body.phone || null,
+            
+            // Conservamos tu excelente lógica de formateo numérico
+            hourlyRate: body.hourlyRate ? parseFloat(body.hourlyRate) : null,
+            employmentType: body.employmentType || "MINIJOB_538", 
+            contractedHoursPerWeek: body.contractedHoursPerWeek 
+              ? parseFloat(body.contractedHoursPerWeek) 
+              : null,
+            vacationDaysPerYear: body.vacationDaysPerYear 
+              ? parseInt(body.vacationDaysPerYear) 
+              : 20, // Mínimo legal por defecto
+          }
+        }
       },
+      // Le pedimos a Prisma que nos devuelva también los datos del empleado recién creado
+      include: {
+        employee: true 
+      }
     })
 
-    return NextResponse.json(employee)
+    // Devolvemos el empleado creado (que está dentro del objeto newUserAndEmployee)
+    return NextResponse.json(newUserAndEmployee.employee)
 
   } catch (error) {
     console.error("EMPLOYEE CREATE ERROR:", error)

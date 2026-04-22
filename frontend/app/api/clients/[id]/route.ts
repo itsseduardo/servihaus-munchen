@@ -47,7 +47,7 @@ export async function GET(
 }
 
 //
-// UPDATE CLIENT (incluye category)
+// UPDATE CLIENT (incluye category y clientType)
 //
 export async function PUT(
   req: Request,
@@ -73,6 +73,9 @@ export async function PUT(
     if (body.email !== undefined) updateData.email = body.email
     if (body.phone !== undefined) updateData.phone = body.phone
     if (body.category !== undefined) updateData.category = body.category
+    
+    // Agregamos clientType al objeto de actualización
+    if (body.clientType !== undefined) updateData.clientType = body.clientType
 
     const updated = await prisma.client.update({
       where: { id: clientId },

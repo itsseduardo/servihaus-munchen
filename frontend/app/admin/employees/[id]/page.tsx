@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import EditEmployeeModal from "@/components/admin/EditEmployeeModal"
 import AddTimeBlockModal from "@/components/admin/AddTimeBlockModal"
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
 
 export default function EmployeeDetailPage() {
   const params = useParams()
@@ -69,6 +71,113 @@ export default function EmployeeDetailPage() {
   if (loading) return <div className="p-10 text-center font-bold">Lade Mitarbeiterdaten...</div>
   if (!employee) return <div className="p-10 text-center font-bold">Mitarbeiter nicht gefunden</div>
 
+  const handleExportPDF = () => {
+    if (!employee) return
+
+    const doc = new jsPDF()
+
+    // 1. Cabecera del Documento (Estilo Oficial)
+    doc.setFontSize(18)
+    doc.setTextColor(15, 23, 42) // slate-900
+    doc.text("Arbeitszeitnachweis", 14, 22)
+
+    doc.setFontSize(10)
+    doc.setTextColor(100, 116, 139) // slate-500
+    doc.text("Offizielles Protokoll gemäß Arbeitszeitgesetz (ArbZG)", 14, 28)
+
+    // 2. Datos del Empleado y Contrato
+    doc.setFontSize(11)
+    doc.setTextColor(15, 23, 42)
+    doc.text(`Mitarbeiter: ${employee.lastName}, ${employee.firstName}`, 14, 40)
+    doc.text(`Personal-ID: #${employee.id.toString().padStart(3, '0')}`, 14, 46)
+
+    const empTypeMap: Record<string, string> = {
+      MINIJOB_538: "Minijob (538€)",
+      MIDIJOB: "Midijob",
+      FULL_TIME: "Vollzeit"
+    }
+    doc.text(`Vertragsart: ${empTypeMap[employee.employmentType] || employee.employmentType}`, 120, 40)
+    doc.text(`Soll-Stunden: ${employee.contractedHoursPerWeek || 0} h / Woche`, 120, 46)
+    doc.text(`Druckdatum: ${new Date().toLocaleDateString('de-DE')}`, 120, 52)
+
+    // 3. Recopilación y Mezcla de Datos (Servicios + Justificantes)
+    const logs: any[] = []
+
+    // A. Servicios completados
+    if (employee.assignments) {
+      employee.assignments.forEach((a: any) => {
+        const s = a.service
+        if (s.status === 'completed') {
+          const fahrzeit = s.travelTime || 0
+          const total = (s.duration || 0) + (fahrzeit / 60)
+
+          logs.push({
+            dateObj: new Date(s.date),
+            datum: new Date(s.date).toLocaleDateString('de-DE'),
+            typ: `Service: ${s.client?.name || 'Kunde'}`,
+            start: s.actualStartTime ? new Date(s.actualStartTime).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '-',
+            ende: s.actualEndTime ? new Date(s.actualEndTime).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '-',
+            fahrzeit: `${fahrzeit} min`,
+            gesamt: `${total.toFixed(2)} h`
+          })
+        }
+      })
+    }
+
+    // B. Bloques de Tiempo (Vacaciones, Enfermedad, Cancelaciones)
+    if (employee.timeBlocks) {
+      const typeLabels: Record<string, string> = {
+        CLIENT_CANCELLED: "Kunden-Stornierung",
+        VACATION: "Urlaub",
+        SICK: "Krankheit",
+        PAID_LEAVE: "Bezahlte Freistellung"
+      }
+
+      employee.timeBlocks.forEach((tb: any) => {
+        logs.push({
+          dateObj: new Date(tb.date),
+          datum: new Date(tb.date).toLocaleDateString('de-DE'),
+          typ: `Manuell: ${typeLabels[tb.type] || tb.type}`,
+          start: "-",
+          ende: "-",
+          fahrzeit: "-",
+          gesamt: `${tb.duration.toFixed(2)} h`
+        })
+      })
+    }
+
+    // 4. Ordenar cronológicamente (Muy importante para la inspección)
+    logs.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())
+
+    // Mapear a formato de tabla
+    const tableBody = logs.map(l => [l.datum, l.typ, l.start, l.ende, l.fahrzeit, l.gesamt])
+
+    // 5. Generar la Tabla en el PDF
+    autoTable(doc, {
+      startY: 65,
+      head: [['Datum', 'Aktivität / Kunde', 'Start', 'Ende', 'Fahrzeit', 'Gesamt (h)']],
+      body: tableBody,
+      headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' }, // Color primary blue-600
+      styles: { fontSize: 9, cellPadding: 3 },
+      alternateRowStyles: { fillColor: [248, 250, 252] }, // slate-50
+      margin: { top: 65 }
+    })
+
+    // 6. Firma y Resumen al final
+    const finalY = (doc as any).lastAutoTable.finalY || 65
+    doc.setFontSize(10)
+    doc.text(`Total Dokumentierte Stunden: ${employee.totalPaidHours?.toFixed(2) || 0} h`, 14, finalY + 15)
+
+    doc.line(14, finalY + 40, 80, finalY + 40)
+    doc.text("Unterschrift Arbeitgeber (Servihaus)", 14, finalY + 45)
+
+    doc.line(120, finalY + 40, 186, finalY + 40)
+    doc.text("Unterschrift Arbeitnehmer", 120, finalY + 45)
+
+    // Guardar y descargar
+    doc.save(`Arbeitszeit_${employee.lastName}_${new Date().toISOString().split('T')[0]}.pdf`)
+  }
+
   return (
     <div className="p-10 space-y-8 bg-slate-50/50 min-h-screen">
 
@@ -108,6 +217,18 @@ export default function EmployeeDetailPage() {
             Zeit buchen
           </button>
 
+
+            {/* 🔥 NUEVO BOTÓN: Exportar PDF */}
+            <button
+              onClick={handleExportPDF}
+              className="px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              PDF Export
+            </button>
+         
 
 
         </div>

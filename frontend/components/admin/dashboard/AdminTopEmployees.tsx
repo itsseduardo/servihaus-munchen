@@ -22,7 +22,7 @@ export default function AdminTopEmployees() {
       
       <div className="mb-6">
         <h3 className="font-bold text-lg">
-          Top Employees by Hours Worked
+          Top Employees
         </h3>
         <p className="text-xs text-[#616b89]">
           Total billable hours this month

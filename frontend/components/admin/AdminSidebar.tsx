@@ -50,6 +50,19 @@ export default function AdminSidebar() {
           label="Employees"
           active={pathname === "/admin/employees"}
         />
+        <SidebarItem
+          href="/admin/inventory"
+          icon="inventory_2"
+          label="Inventory"
+          active={pathname === "/admin/inventory"}
+        />
+        <SidebarItem
+          href="/admin/products"
+          icon="category"
+          label="Products"
+          active={pathname === "/admin/products"}
+        />
+
       </nav>
 
       {/* User Section */}

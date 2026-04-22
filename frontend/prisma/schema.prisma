@@ -53,6 +53,8 @@ model Client {
   clientType    ClientType     @default(PRIVAT) // PRIVAT o FIRMA
 
   services Service[]
+  inventories   ClientInventory[]
+  deliveryLogs  DeliveryLog[]
 }
 
 model Service {
@@ -101,6 +103,9 @@ model Service {
 
   parentService Service? @relation("Recurrence", fields: [parentServiceId], references: [id])
   childServices Service[] @relation("Recurrence")
+
+  actualTravelStartTime DateTime?
+  extraHoursReason      String?   @db.Text
 }
 
 enum PricingModel {
@@ -155,6 +160,39 @@ model TimeBlock {
   employee      Employee       @relation(fields: [employeeId], references: [id])
 }
 
+// --- NUEVOS MODELOS DE INVENTARIO ---
+
+model Product {
+  id          Int               @id @default(autoincrement())
+  name        String            @unique // Ej: "Domestos Prof Gel WC"
+  unit        String            // Ej: "1L", "200Stk"
+  minStock    Float             @default(1) // El límite para que salte la alerta a José
+  globalStock Float             @default(0) // Lo que hay en la oficina de Servihaus
+  inventories ClientInventory[]
+}
+
+model ClientInventory {
+  id          Int      @id @default(autoincrement())
+  clientId    Int
+  productId   Int
+  quantity    Float    // Cantidad actual en el cliente
+  lastUpdated DateTime @updatedAt
+
+  client      Client   @relation(fields: [clientId], references: [id])
+  product     Product  @relation(fields: [productId], references: [id])
+}
+
+model DeliveryLog {
+  id           Int      @id @default(autoincrement())
+  deliveryCode String   @unique // Ej: "SAMP.0126.100-A.1"
+  clientId     Int
+  date         DateTime
+  items        Json     // Guardamos el recibo de lo que se entregó
+  createdAt    DateTime @default(now())
+
+  client       Client   @relation(fields: [clientId], references: [id])
+}
+
 enum TimeBlockType {
   VACATION
   SICK
@@ -169,7 +207,7 @@ enum Role {
 }
 
 enum EmploymentType {
-  MINIJOB_538 // El límite actual en Alemania
+  MINIJOB_603 // El límite actual en Alemania
   MIDIJOB
   FULL_TIME
 }

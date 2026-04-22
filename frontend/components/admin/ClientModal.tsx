@@ -19,6 +19,7 @@ export default function ClientModal({ client, onClose, onSaved }: Props) {
   const [category, setCategory] = useState("C")
   const [clientType, setClientType] = useState("PRIVAT")
   const [loading, setLoading] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     if (client) {
@@ -32,6 +33,7 @@ export default function ClientModal({ client, onClose, onSaved }: Props) {
     }
   }, [client])
 
+  // Función para GUARDAR (Crear o Actualizar)
   const handleSubmit = async () => {
     if (!clientCode || !name) {
       alert("Code und Name sind erforderlich")
@@ -68,6 +70,32 @@ export default function ClientModal({ client, onClose, onSaved }: Props) {
       onClose()
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Función para ELIMINAR
+  const handleDelete = async () => {
+    const confirmed = window.confirm("Bist du sicher? (¿Estás seguro de que deseas eliminar este cliente? Esta acción no se puede deshacer)")
+    if (!confirmed) return
+
+    setIsDeleting(true)
+    try {
+      const res = await fetch(`/api/clients/${client.id}`, {
+        method: "DELETE",
+      })
+
+      if (res.ok) {
+        onSaved() // Refresca la lista de clientes en la vista principal
+        onClose() // Cierra el modal
+      } else {
+        console.error("Error al eliminar el cliente")
+        alert("Fehler beim Löschen. (Es posible que este cliente tenga servicios asociados y no pueda ser eliminado).")
+      }
+    } catch (error) {
+      console.error("Error de conexión:", error)
+      alert("Error de conexión.")
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -190,20 +218,40 @@ export default function ClientModal({ client, onClose, onSaved }: Props) {
         </div>
 
         {/* FOOTER */}
-        <div className="px-8 py-6 border-t flex justify-end gap-3 bg-slate-50">
-          <button
-            onClick={onClose}
-            className="px-6 py-2.5 rounded-xl border border-slate-300 font-bold text-sm hover:bg-slate-200 transition"
-          >
-            Abbrechen
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="px-10 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all disabled:opacity-50"
-          >
-            {loading ? "Speichern..." : "Speichern"}
-          </button>
+        <div className="px-8 py-6 border-t flex justify-between items-center bg-slate-50">
+          
+          {/* BOTÓN ELIMINAR (IZQUIERDA) */}
+          <div>
+            {isEdit && (
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting || loading}
+                className="px-4 py-2.5 rounded-xl border border-red-200 text-red-600 font-bold text-sm hover:bg-red-50 hover:border-red-300 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[18px]">delete</span>
+                {isDeleting ? "Wird gelöscht..." : "Kunden löschen"}
+              </button>
+            )}
+          </div>
+
+          {/* BOTONES CANCELAR / GUARDAR (DERECHA) */}
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              disabled={loading || isDeleting}
+              className="px-6 py-2.5 rounded-xl border border-slate-300 font-bold text-sm hover:bg-slate-200 transition disabled:opacity-50"
+            >
+              Abbrechen
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={loading || isDeleting}
+              className="px-10 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all disabled:opacity-50"
+            >
+              {loading ? "Speichern..." : "Speichern"}
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
