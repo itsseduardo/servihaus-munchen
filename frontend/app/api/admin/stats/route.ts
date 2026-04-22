@@ -30,7 +30,7 @@ export async function GET() {
       
       // Ingreso = Horas facturadas al cliente * Precio del código de servicio
       if (s.serviceCode) {
-        estimatedRevenue += (s.billedHours || 0) * s.serviceCode.pricePerHour
+        estimatedRevenue += (s.billedHours || 0) * 0
       }
     })
 
