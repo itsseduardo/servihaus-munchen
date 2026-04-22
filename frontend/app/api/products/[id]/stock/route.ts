@@ -3,11 +3,15 @@ import { NextResponse } from "next/server"
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  // 1. Cambiamos la firma de params a una Promesa
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { quantity } = await req.json()
-    const productId = parseInt(params.id)
+    
+    // 2. Extraemos el id usando 'await'
+    const { id } = await context.params
+    const productId = parseInt(id)
 
     if (isNaN(quantity) || quantity <= 0) {
       return NextResponse.json({ error: "Ungültige Menge" }, { status: 400 })
