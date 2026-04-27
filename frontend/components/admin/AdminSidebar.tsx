@@ -62,6 +62,12 @@ export default function AdminSidebar() {
           label="Products"
           active={pathname === "/admin/products"}
         />
+        <SidebarItem
+          href="/admin/attendance"
+          icon="access_time"
+          label="Attendance"
+          active={pathname === "/admin/attendance"}
+        />
 
       </nav>
 

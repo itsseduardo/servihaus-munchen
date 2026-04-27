@@ -35,9 +35,11 @@ model Employee {
 
   auditLogs             AuditLog[]
   timeBlocks            TimeBlock[]
+  workShifts          WorkShift[]
 
   user        User? @relation(fields: [userId], references: [id])
   assignments ServiceAssignment[]
+  debtHours Float @default(0) // Horas que el empleado debe recuperar
 }
 
 model Client {
@@ -106,6 +108,8 @@ model Service {
 
   actualTravelStartTime DateTime?
   extraHoursReason      String?   @db.Text
+  overtimeJustification String?   @db.Text
+  adminNotes            String?   @db.Text
 }
 
 enum PricingModel {
@@ -169,6 +173,26 @@ model Product {
   minStock    Float             @default(1) // El límite para que salte la alerta a José
   globalStock Float             @default(0) // Lo que hay en la oficina de Servihaus
   inventories ClientInventory[]
+  movements       InventoryMovement[]
+}
+
+model InventoryMovement {
+  id          Int          @id @default(autoincrement())
+  
+  // Relación con el producto
+  product     Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId   Int
+  
+  type        MovementType // Si es IN (Entrada) o OUT (Salida)
+  quantity    Float        // Cantidad movida
+  
+  // Datos financieros (Principalmente para entradas)
+  costPerUnit Float?       // Cuánto costó cada unidad (ej. 2.50€ por litro)
+  provider    String?      // Quién lo vendió (ej. Metro, Amazon, Aldi)
+  
+  // Metadatos
+  notes       String?      // Notas (ej. "Llegaron 2 botellas rotas")
+  createdAt   DateTime     @default(now())
 }
 
 model ClientInventory {
@@ -191,6 +215,23 @@ model DeliveryLog {
   createdAt    DateTime @default(now())
 
   client       Client   @relation(fields: [clientId], references: [id])
+}
+
+model WorkShift {
+  id                    Int            @id @default(autoincrement())
+  employeeId            Int
+  employee              Employee       @relation(fields: [employeeId], references: [id])
+  
+  date                  DateTime       @default(now())
+  clockIn               DateTime       @default(now())
+  clockOut              DateTime?      // Se llena al terminar la jornada
+  
+  status                ShiftStatus    @default(ON_TIME)
+  justification         String?        @db.Text
+  approvalStatus        ApprovalStatus @default(PENDING)
+  
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
 }
 
 enum TimeBlockType {
@@ -224,4 +265,20 @@ enum ClientCategory {
   D
   E
   Z
+}
+
+enum MovementType {
+  IN   // Entrada (Compras a proveedor)
+  OUT  // Salida (Entregas a clientes o mermas)
+}
+
+enum ShiftStatus {
+  ON_TIME
+  LATE
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

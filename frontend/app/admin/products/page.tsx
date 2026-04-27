@@ -2,16 +2,18 @@
 
 import { useEffect, useState } from "react"
 import AddProductModal from "@/components/admin/AddProductModal"
-import AddStockModal from "@/components/admin/AddStockModal"
+import InboundModal from "@/components/admin/InboundModal" // Importamos el nuevo modal transaccional
 
 export default function ProductsCatalogPage() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   
-  // Estados para controlar los dos modales
+  // Estados para controlar los dos modales principales
   const [isProductModalOpen, setIsProductModalOpen] = useState(false)
-  const [isStockModalOpen, setIsStockModalOpen] = useState(false)
-  const [selectedProduct, setSelectedProduct] = useState<any>(null)
+  const [isInboundModalOpen, setIsInboundModalOpen] = useState(false)
+  
+  // Guardamos el ID del producto si José hace clic desde una fila específica
+  const [preselectedProductId, setPreselectedProductId] = useState<string | undefined>(undefined)
 
   const fetchProducts = async () => {
     try {
@@ -29,28 +31,54 @@ export default function ProductsCatalogPage() {
     fetchProducts()
   }, [])
 
+  // Función para abrir el modal de ingreso pre-seleccionando un producto
+  const handleOpenInboundForProduct = (productId: string) => {
+    setPreselectedProductId(productId)
+    setIsInboundModalOpen(true)
+  }
+
+  // Función para abrir el modal de ingreso vacío (desde el botón superior)
+  const handleOpenGeneralInbound = () => {
+    setPreselectedProductId(undefined)
+    setIsInboundModalOpen(true)
+  }
+
   if (loading) return (
     <div className="p-10 flex flex-col items-center justify-center min-h-screen bg-slate-50">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-800 mb-4"></div>
-      <p className="text-slate-400 font-black uppercase tracking-widest text-[10px]">Lade Produktkatalog...</p>
+      <p className="text-slate-400 font-black uppercase tracking-widest text-[10px]">Lade Zentrallager...</p>
     </div>
   )
 
   return (
     <div className="p-8 space-y-8 bg-slate-50/50 min-h-screen text-slate-900">
       
-      {/* 1. HEADER Y ACCIÓN PRINCIPAL */}
-      <div className="flex justify-between items-end">
+      {/* 1. CABECERA Y ACCIONES PRINCIPALES */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tighter uppercase">Produktkatalog</h1>
-          <p className="text-sm text-slate-500 font-medium italic">Zentrallager & Stammdaten (Almacén Central)</p>
+          <h1 className="text-3xl font-black tracking-tighter uppercase">Zentrallager</h1>
+          <p className="text-sm text-slate-500 font-medium italic">Bestandsverwaltung & Wareneingang (Bodega Central)</p>
         </div>
-        <button 
-          onClick={() => setIsProductModalOpen(true)}
-          className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-black transition-all flex items-center gap-2"
-        >
-          <span className="text-lg">+</span> Neues Produkt
-        </button>
+        
+        <div className="flex gap-3">
+          {/* Botón Secundario: Crear Producto Nuevo en Catálogo */}
+          <button 
+            onClick={() => setIsProductModalOpen(true)}
+            className="bg-white border border-slate-300 text-slate-700 px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm hover:bg-slate-50 transition-all flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[18px]">add_box</span> 
+            Neues Produkt
+          </button>
+
+          {/* Botón Principal: Ingresar Mercancía (Compras) */}
+          <button 
+            onClick={handleOpenGeneralInbound}
+            className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[18px]">local_shipping</span> 
+            Wareneingang
+          </button>
+        </div>
       </div>
 
       {/* 2. TABLA DE PRODUCTOS (CATÁLOGO GLOBAL) */}
@@ -69,7 +97,7 @@ export default function ProductsCatalogPage() {
             {products.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-8 py-20 text-center text-slate-400 italic font-medium">
-                  No hay productos en el catálogo. Comienza agregando uno nuevo.
+                  Keine Produkte im Katalog. (No hay productos en el catálogo).
                 </td>
               </tr>
             ) : (
@@ -104,19 +132,14 @@ export default function ProductsCatalogPage() {
                     </td>
                     <td className="px-8 py-5 text-right">
                       <div className="flex justify-end gap-2">
-                        {/* Botón para añadir Stock */}
+                        {/* Botón para registrar entrada de este producto específico */}
                         <button 
-                          onClick={() => {
-                            setSelectedProduct(p);
-                            setIsStockModalOpen(true);
-                          }}
+                          onClick={() => handleOpenInboundForProduct(p.id.toString())}
                           className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all text-[10px] font-black uppercase"
-                          title="Stock aufstocken"
+                          title="Wareneingang für dieses Produkt"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
-                          </svg>
-                          Aufstocken
+                          <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>
+                          Einbuchen
                         </button>
                       </div>
                     </td>
@@ -130,7 +153,7 @@ export default function ProductsCatalogPage() {
 
       {/* 3. MODALES DE GESTIÓN */}
       
-      {/* Modal para Crear Producto Nuevo */}
+      {/* Modal para Crear Producto Nuevo en el Catálogo */}
       {isProductModalOpen && (
         <AddProductModal 
           onClose={() => setIsProductModalOpen(false)} 
@@ -141,17 +164,17 @@ export default function ProductsCatalogPage() {
         />
       )}
 
-      {/* Modal para Añadir Stock al Almacén Central */}
-      {isStockModalOpen && (
-        <AddStockModal 
-          product={selectedProduct}
+      {/* Modal para Ingresar Mercancía (Wareneingang) */}
+      {isInboundModalOpen && (
+        <InboundModal 
+          preselectedProductId={preselectedProductId}
           onClose={() => {
-            setIsStockModalOpen(false)
-            setSelectedProduct(null)
+            setIsInboundModalOpen(false)
+            setPreselectedProductId(undefined)
           }}
           onSuccess={() => {
-            setIsStockModalOpen(false)
-            setSelectedProduct(null)
+            setIsInboundModalOpen(false)
+            setPreselectedProductId(undefined)
             fetchProducts()
           }}
         />

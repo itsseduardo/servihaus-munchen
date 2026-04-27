@@ -81,7 +81,7 @@ export default function EditEmployeeModal({ employee, onClose, onUpdated }: Prop
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Anstellungsart</label>
                 <select className="w-full h-11 rounded-xl border bg-white px-3 text-sm font-bold" value={employmentType} onChange={(e) => setEmploymentType(e.target.value)}>
-                  <option value="MINIJOB_538">Minijob (538€)</option>
+                  <option value="MINIJOB_603">Minijob (603€)</option>
                   <option value="MIDIJOB">Midijob</option>
                   <option value="FULL_TIME">Vollzeit</option>
                 </select>

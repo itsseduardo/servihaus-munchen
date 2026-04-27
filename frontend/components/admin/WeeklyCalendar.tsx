@@ -117,7 +117,7 @@ export default function WeeklyCalendar({ days, servicesByDay }: WeeklyCalendarPr
 
                 {servicesByDay[day.iso]?.map((service, _, allServices) => {
                   
-                  // 🔥 MEJORA DE JOSÉ: REUBICACIÓN POR HORA REAL
+                  //  REUBICACIÓN POR HORA REAL
                   // Si tiene actualStartTime, usamos esa hora para posicionar el bloque
                   let displayHour: number, displayMinutes: number;
                   
@@ -133,7 +133,7 @@ export default function WeeklyCalendar({ days, servicesByDay }: WeeklyCalendarPr
 
                   const top = (displayHour - START_HOUR) * HOUR_HEIGHT + (displayMinutes / 60) * HOUR_HEIGHT;
 
-                  // 🔥 MEJORA DE JOSÉ: DURACIÓN BASADA EN EQUIPO (Ocupación real de la casa)
+                  //  REUBICACIÓN POR HORA REAL
                   const blockDuration = service.teamDuration ?? service.duration ?? 1;
                   const durationHours = parseFloat(blockDuration as any);
                   const height = durationHours * HOUR_HEIGHT;

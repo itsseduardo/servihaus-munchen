@@ -1,141 +1,106 @@
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
-import { startOfWeek, endOfWeek, eachDayOfInterval, format, subDays } from "date-fns"
-import { de } from "date-fns/locale"
 
 export async function GET() {
   try {
-    // 1. CONTEOS BÁSICOS (KPIs)
-    const [totalServices, totalEmployees, totalClients, zClients, openServices] = await Promise.all([
-      prisma.service.count(),
-      prisma.employee.count(),
-      prisma.client.count(),
-      prisma.client.count({ where: { category: 'Z' } }),
-      prisma.service.count({ where: { status: { in: ['assigned', 'in_progress'] } } })
-    ])
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
 
-    // 2. CÁLCULO DE INGRESOS Y HORAS TOTALES (Servicios completados)
-    const completedServices = await prisma.service.findMany({
-      where: { status: 'completed' },
-      include: { serviceCode: true }
-    })
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay() + 1);
 
-    let totalPaidHours = 0
-    let estimatedRevenue = 0
+    const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
 
-    completedServices.forEach(s => {
-      // Sumamos duración + tiempo de viaje (en horas)
-      const hours = (s.duration || 0) + ((s.travelTime || 0) / 60)
-      totalPaidHours += hours
-      
-      // Ingreso = Horas facturadas al cliente * Precio del código de servicio
-      if (s.serviceCode) {
-        estimatedRevenue += (s.billedHours || 0) * 0
-      }
-    })
+    // 1. SERVICIOS HOY Y ALERTAS
+    const [servicesToday, unassignedServices, inventoryAlerts] = await Promise.all([
+      prisma.service.count({ where: { date: { gte: today, lt: tomorrow } } }),
+      prisma.service.count({ where: { date: { gte: today }, assignments: { none: {} } } }),
+      // 🔥 ESTO ES NUEVO: Buscamos inventarios de clientes que estén en 0
+      prisma.clientInventory.findMany({
+        where: { quantity: { lte: 0 } },
+        include: { client: true, product: true }
+      })
+    ]);
 
-    // 3. DATOS PARA EL GRÁFICO DE BARRAS (Últimos 7 días)
-    const last7Days = eachDayOfInterval({
-      start: subDays(new Date(), 6),
-      end: new Date()
-    })
-
-    const servicesByDay = await prisma.service.findMany({
-      where: {
-        date: { gte: subDays(new Date(), 7) }
-      }
-    })
-
-    const barData = last7Days.map(day => {
-      const count = servicesByDay.filter(s => 
-        format(new Date(s.date), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
-      ).length
-      return {
-        name: format(day, 'eee', { locale: de }),
-        servicios: count
-      }
-    })
-
-    // 4. DATOS PARA EL PIE CHART (Status)
-    const statusGroups = await prisma.service.groupBy({
-      by: ['status'],
-      _count: true
-    })
-
-    const statusLabels: Record<string, string> = {
-      completed: "Abgeschlossen",
-      assigned: "Geplant",
-      in_progress: "In Arbeit",
-      cancelled: "Storniert"
-    }
-
-    const pieData = statusGroups.map(group => ({
-      name: statusLabels[group.status] || group.status,
-      value: group._count
-    }))
-
-    // 5. EMPLEADOS CON HORAS FALTANTES (FEHLSTUNDEN)
-    // Calculamos el balance de la semana actual para todos
-    const start = startOfWeek(new Date(), { weekStartsOn: 1 })
-    const end = endOfWeek(new Date(), { weekStartsOn: 1 })
-
+    // 2. OCUPACIÓN Y TOP EMPLEADOS
     const employees = await prisma.employee.findMany({
       include: {
         assignments: {
-          where: { service: { date: { gte: start, lte: end }, status: 'completed' } },
-          include: { service: true }
-        },
-        timeBlocks: {
-          where: { date: { gte: start, lte: end } }
+          include: { service: true },
+          where: { service: { date: { gte: startOfWeek } } }
         }
       }
-    })
+    });
 
-    const underperformingEmployees = employees.map(emp => {
-      let worked = 0
-      emp.assignments.forEach(a => {
-        worked += (a.service.duration || 0) + ((a.service.travelTime || 0) / 60)
-      })
-      emp.timeBlocks.forEach(tb => { worked += tb.duration })
-
-      const soll = emp.contractedHoursPerWeek || 0
-      const diff = soll - worked
+    const workload = employees.map(emp => {
+      const weekHours = emp.assignments.reduce((sum, a) => sum + (a.service.teamDuration || 0), 0);
+      const todayHours = emp.assignments
+        .filter(a => a.service.date >= today && a.service.date < tomorrow)
+        .reduce((sum, a) => sum + (a.service.teamDuration || 0), 0);
 
       return {
-        id: emp.id,
-        name: `${emp.lastName}, ${emp.firstName}`,
-        soll: soll.toFixed(2),
-        ist: worked.toFixed(2),
-        diff: diff.toFixed(2)
+        name: `${emp.firstName}`,
+        weekHours,
+        todayHours,
+        availableToday: (emp.contractedHoursPerWeek || 40) / 5
+      };
+    });
+
+    const totalCapacityToday = workload.reduce((sum, e) => sum + e.availableToday, 0);
+    const totalAssignedToday = workload.reduce((sum, e) => sum + e.todayHours, 0);
+    const occupancyToday = totalCapacityToday > 0 ? (totalAssignedToday / totalCapacityToday) * 100 : 0;
+
+    // 3. TOP CLIENTES Y PRECISIÓN
+    const recentServices = await prisma.service.findMany({
+      where: { date: { gte: startOfWeek } },
+      include: { client: true }
+    });
+
+    const clientMap: Record<string, number> = {};
+    let totalEstimated = 0;
+    let totalReal = 0;
+    let completedCount = 0;
+
+    recentServices.forEach(s => {
+      clientMap[s.client.name] = (clientMap[s.client.name] || 0) + 1;
+      if (s.actualStartTime && s.actualEndTime) {
+        const real = (s.actualEndTime.getTime() - s.actualStartTime.getTime()) / (1000 * 60 * 60);
+        totalEstimated += (s.teamDuration || 0);
+        totalReal += real;
+        completedCount++;
       }
-    }).filter(e => parseFloat(e.diff) > 0) // Solo los que deben horas
-      .sort((a, b) => parseFloat(b.diff) - parseFloat(a.diff))
-      .slice(0, 5) // Top 5 para no saturar
+    });
+
+    const topClients = Object.entries(clientMap)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const precision = completedCount > 0 ? (totalReal / totalEstimated) * 100 : 100;
+
+    // 4. COMPARATIVA MENSUAL
+    const [thisMonthCount, lastMonthCount] = await Promise.all([
+      prisma.service.count({ where: { date: { gte: new Date(today.getFullYear(), today.getMonth(), 1) } } }),
+      prisma.service.count({ where: { date: { gte: startOfLastMonth, lte: endOfLastMonth } } })
+    ]);
 
     return NextResponse.json({
       kpis: {
-        totalServices,
-        totalEmployees,
-        totalClients,
-        zClients,
-        openServices,
-        totalPaidHours: totalPaidHours.toFixed(1),
-        estimatedRevenue: estimatedRevenue.toLocaleString('de-DE')
+        servicesToday,
+        occupancyToday: Math.round(occupancyToday),
+        totalWeekHours: workload.reduce((sum, e) => sum + e.weekHours, 0),
+        unassignedAlerts: unassignedServices,
+        growth: lastMonthCount > 0 ? Math.round(((thisMonthCount - lastMonthCount) / lastMonthCount) * 100) : 0,
+        precision: Math.round(precision)
       },
-      barData,
-      pieData,
-      underperformingEmployees,
-      // Data dummy para la línea de tendencia (se puede implementar real luego)
-      lineData: [
-        { name: 'KW 10', valor: 2100 },
-        { name: 'KW 11', valor: 2400 },
-        { name: 'KW 12', valor: 1900 },
-        { name: 'KW 13', valor: 3200 },
-      ]
-    })
-
+      topClients,
+      topEmployees: workload.sort((a, b) => b.weekHours - a.weekHours).slice(0, 5),
+      inventoryAlerts
+    });
   } catch (error) {
-    console.error("STATS API ERROR:", error)
-    return NextResponse.json({ error: "Server Error" }, { status: 500 })
+    return NextResponse.json({ error: "Error de servidor" }, { status: 500 });
   }
 }

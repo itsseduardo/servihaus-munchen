@@ -26,6 +26,10 @@ export default function ClientsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
+  // 1. Estados para los filtros
+  const [searchTerm, setSearchTerm] = useState("")
+  const [typeFilter, setTypeFilter] = useState("ALL")
+
   useEffect(() => {
     fetchClients()
   }, [])
@@ -43,18 +47,40 @@ export default function ClientsPage() {
     }
   }
 
-  const categoryOrder = ["A", "B", "C", "D", "E", "Z"]
+  // 🔥 2. FILTRADO (Usa useMemo para mayor velocidad)
+  const filteredClients = useMemo(() => {
+    return clients.filter((client) => {
+      // Búsqueda de texto (Nombre, Email, Dirección o Código)
+      const matchesSearch =
+        client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        client.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        client.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        client.clientCode?.toLowerCase().includes(searchTerm.toLowerCase())
 
+      // Filtro por tipo (Asegurándonos de usar clientType y FIRMA)
+      const matchesType = typeFilter === "ALL" || client.clientType === typeFilter
+
+      return matchesSearch && matchesType
+    })
+  }, [clients, searchTerm, typeFilter])
+
+  // 🔥 3. ORDENAMIENTO (Ahora ordenamos los filtrados, no los originales)
+  const categoryOrder = ["A", "B", "C", "D", "E", "Z"]
   const sortedClients = useMemo(() => {
-    return [...clients].sort((a, b) => {
+    return [...filteredClients].sort((a, b) => {
       const catA = categoryOrder.indexOf(a.category)
       const catB = categoryOrder.indexOf(b.category)
-      
+
       if (catA !== catB) return catA - catB
-      
+
       return a.clientCode.localeCompare(b.clientCode, undefined, { numeric: true })
     })
-  }, [clients])
+  }, [filteredClients]) // <-- El cambio clave está aquí
+
+  // 🔥 4. RESET DE PÁGINA (Si el admin busca algo, lo mandamos a la página 1)
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, typeFilter])
 
   const stats = useMemo(() => {
     return {
@@ -65,6 +91,7 @@ export default function ClientsPage() {
     }
   }, [clients])
 
+  // 5. PAGINACIÓN (Basada en los ordenados y filtrados)
   const totalPages = Math.ceil(sortedClients.length / itemsPerPage)
   const paginatedClients = sortedClients.slice(
     (currentPage - 1) * itemsPerPage,
@@ -138,74 +165,112 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b">
-              <th className="px-8 py-5 text-left">Code</th>
-              <th className="px-8 py-5 text-left">Typ</th>
-              <th className="px-8 py-5 text-left">Name / Firma</th>
-              <th className="px-8 py-5 text-left">Kategorie</th>
-              <th className="px-8 py-5 text-left">Standort</th>
-              <th className="px-8 py-5 text-left">Kontakt</th>
-            </tr>
-          </thead>
-
-          <tbody className="divide-y divide-slate-100">
-            {paginatedClients.map((client) => (
-              <tr key={client.id} className="hover:bg-slate-50/50 transition-colors group">
-                <td className="px-8 py-5">
-                  <span 
-                    onClick={() => router.push(`/admin/clients/${client.id}`)}
-                    className="font-black text-blue-600 cursor-pointer hover:underline"
-                  >
-                    #{client.clientCode}
-                  </span>
-                </td>
-
-                <td className="px-8 py-5">
-                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                    client.clientType === "FIRMA" ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"
-                  }`}>
-                    {client.clientType === "FIRMA" ? "Firma" : "Privat"}
-                  </span>
-                </td>
-
-                <td className="px-8 py-5">
-                  <p 
-                    onClick={() => router.push(`/admin/clients/${client.id}`)}
-                    className="font-bold text-slate-800 cursor-pointer group-hover:text-blue-600 transition-colors"
-                  >
-                    {client.name}
-                  </p>
-                </td>
-
-                <td className="px-8 py-5">
-                  <select
-                    value={client.category}
-                    onChange={(e) => updateCategory(client.id, e.target.value)}
-                    className={`px-3 py-1 rounded-lg text-xs font-black border-2 cursor-pointer outline-none transition-all ${categoryStyles[client.category]}`}
-                  >
-                    {categoryOrder.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                  </select>
-                </td>
-
-                <td className="px-8 py-5 text-slate-500 font-medium">
-                  {client.address || "-"}
-                </td>
-
-                <td className="px-8 py-5">
-                  <p className="text-slate-700 font-bold">{client.phone || "-"}</p>
-                  <p className="text-[10px] text-slate-400">{client.email || "-"}</p>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* BARRA DE BÚSQUEDA Y FILTROS */}
+      <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="relative flex-1">
+          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+          <input
+            type="text"
+            placeholder="Suchen nach Name, Email, Adresse, Code... (Buscar cliente)"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-12 pr-4 py-3 rounded-xl bg-slate-50/50 border-none focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm font-medium text-slate-700"
+          />
+        </div>
+        <div className="w-px bg-slate-100 hidden md:block"></div>
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="px-6 py-3 rounded-xl bg-transparent border-none outline-none text-sm font-bold text-slate-600 cursor-pointer hover:bg-slate-50 transition-colors"
+        >
+          <option value="ALL">Alle Typen (Todos)</option>
+          <option value="PRIVAT">Privat (Particular)</option>
+          <option value="FIRMA">Firma (Empresa)</option>
+        </select>
       </div>
 
+      {/* RESULTADOS O TABLA */}
+      {paginatedClients.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-slate-200 p-16 text-center shadow-sm">
+          <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">search_off</span>
+          <h3 className="text-lg font-black text-slate-700">Keine Kunden gefunden</h3>
+          <p className="text-slate-500 mt-2 text-sm">No se encontraron clientes con esos filtros.</p>
+          <button 
+            onClick={() => { setSearchTerm(""); setTypeFilter("ALL"); }}
+            className="mt-6 px-4 py-2 bg-slate-100 text-slate-600 font-bold rounded-lg hover:bg-slate-200 transition-colors"
+          >
+            Filtros borrar (Limpiar)
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b">
+                <th className="px-8 py-5 text-left">Code</th>
+                <th className="px-8 py-5 text-left">Typ</th>
+                <th className="px-8 py-5 text-left">Name / Firma</th>
+                <th className="px-8 py-5 text-left">Kategorie</th>
+                <th className="px-8 py-5 text-left">Standort</th>
+                <th className="px-8 py-5 text-left">Kontakt</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-slate-100">
+              {paginatedClients.map((client) => (
+                <tr key={client.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <td className="px-8 py-5">
+                    <span
+                      onClick={() => router.push(`/admin/clients/${client.id}`)}
+                      className="font-black text-blue-600 cursor-pointer hover:underline"
+                    >
+                      #{client.clientCode}
+                    </span>
+                  </td>
+
+                  <td className="px-8 py-5">
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${client.clientType === "FIRMA" ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"
+                      }`}>
+                      {client.clientType === "FIRMA" ? "Firma" : "Privat"}
+                    </span>
+                  </td>
+
+                  <td className="px-8 py-5">
+                    <p
+                      onClick={() => router.push(`/admin/clients/${client.id}`)}
+                      className="font-bold text-slate-800 cursor-pointer group-hover:text-blue-600 transition-colors"
+                    >
+                      {client.name}
+                    </p>
+                  </td>
+
+                  <td className="px-8 py-5">
+                    <select
+                      value={client.category}
+                      onChange={(e) => updateCategory(client.id, e.target.value)}
+                      className={`px-3 py-1 rounded-lg text-xs font-black border-2 cursor-pointer outline-none transition-all ${categoryStyles[client.category]}`}
+                    >
+                      {categoryOrder.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                  </td>
+
+                  <td className="px-8 py-5 text-slate-500 font-medium">
+                    {client.address || "-"}
+                  </td>
+
+                  <td className="px-8 py-5">
+                    <p className="text-slate-700 font-bold">{client.phone || "-"}</p>
+                    <p className="text-[10px] text-slate-400">{client.email || "-"}</p>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2">
+        <div className="flex justify-center items-center gap-2 mt-6">
           <button
             disabled={currentPage === 1}
             onClick={() => setCurrentPage((p) => p - 1)}
@@ -217,11 +282,10 @@ export default function ClientsPage() {
             <button
               key={i + 1}
               onClick={() => setCurrentPage(i + 1)}
-              className={`w-10 h-10 rounded-xl font-bold text-sm transition-all ${
-                currentPage === i + 1
+              className={`w-10 h-10 rounded-xl font-bold text-sm transition-all ${currentPage === i + 1
                   ? "bg-blue-600 text-white shadow-lg"
                   : "bg-white border border-slate-200 text-slate-500 hover:bg-slate-50"
-              }`}
+                }`}
             >
               {i + 1}
             </button>

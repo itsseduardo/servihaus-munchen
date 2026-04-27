@@ -131,7 +131,7 @@ export default function ProfileTab() {
             <div>
               <p className="text-[10px] font-bold text-gray-400 uppercase">Vertragstyp (Contrato)</p>
               <p className="text-sm font-extrabold text-slate-900">
-                {employeeData?.employmentType === 'MINIJOB_538' ? 'Minijob (538€)' : 
+                {employeeData?.employmentType === 'MINIJOB_603' ? 'Minijob (603€)' : 
                  employeeData?.employmentType === 'MIDIJOB' ? 'Midijob' : 
                  employeeData?.employmentType === 'FULL_TIME' ? 'Vollzeit / Teilzeit' : 'Nicht angegeben'}
               </p>
