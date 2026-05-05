@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { getISOWeek } from "date-fns"
 import CreateServiceModal from "@/components/admin/CreateServiceModal"
 import ServiceDetailsModal from "@/components/admin/ServiceDetailsModal"
-import { ServiceType } from "@/types/service"
+import { ServiceType } from "@/public/types/service"
 
 const START_HOUR = 6
 const END_HOUR = 22
