@@ -9,13 +9,18 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   name      String
-  email     String   @unique
+  email     String    @unique
   password  String
-  role      Role     @default(EMPLOYEE)
-  createdAt DateTime @default(now())
-  employee  Employee?
+  role      Role      @default(EMPLOYEE)
+  createdAt DateTime  @default(now())
+  
+  employee  Employee? // Relación actual
+  
+  // NUEVA RELACIÓN PARA CLIENTES
+  client    Client?   @relation(fields: [clientId], references: [id])
+  clientId  Int?      @unique 
 }
 
 model Employee {
@@ -36,10 +41,13 @@ model Employee {
   auditLogs             AuditLog[]
   timeBlocks            TimeBlock[]
   workShifts          WorkShift[]
+  payrollRecords PayrollRecord[]
+  workAuditLogs          EmployeeAuditLog[] @relation("EmployeeWorkAudits")
 
   user        User? @relation(fields: [userId], references: [id])
   assignments ServiceAssignment[]
   debtHours Float @default(0) // Horas que el empleado debe recuperar
+  isActive  Boolean @default(true)
 }
 
 model Client {
@@ -53,10 +61,12 @@ model Client {
   category   ClientCategory @default(C)
 
   clientType    ClientType     @default(PRIVAT) // PRIVAT o FIRMA
+  hasCompletedOnboarding Boolean        @default(false) // Control de onboarding
 
   services Service[]
   inventories   ClientInventory[]
   deliveryLogs  DeliveryLog[]
+  user       User?
 }
 
 model Service {
@@ -234,6 +244,55 @@ model WorkShift {
   updatedAt             DateTime       @updatedAt
 }
 
+// Modelo para registrar los costos mensuales exactos (El Excel de José)
+model PayrollRecord {
+  id              Int      @id @default(autoincrement())
+  month           Int      // 1 al 12 (Enero a Diciembre)
+  year            Int      // Ej. 2024
+  
+  workedHours     Float    // Horas reales trabajadas ese mes
+  
+  // La tablita de costos
+  brutto          Float    // Salario Bruto
+  svAbzuege       Float    // SV-rechtliche Abzüge (Salud, Pensión, Knappschaft)
+  steuerAbzuege   Float    // Steuerrechtliche Abzüge (Lohnsteuer, etc.)
+  netto           Float    // Salario Neto (Lo que recibe el empleado)
+  totalCost       Float    // Costo total para ServiHaus (Lo que sale del bolsillo de José)
+
+  // Relación con el empleado
+  employeeId      Int
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Para evitar que se creen dos nóminas del mismo empleado en el mismo mes y año
+  @@unique([employeeId, month, year])
+}
+
+enum EmployeeAuditType {
+  ADJUSTMENT  // Ajuste manual (ej. para saldar deudas)
+  ABSENCE     // Falta (no asistió)
+  LATE        // Llegada tarde
+  OVERTIME    // Horas extra aprobadas
+  SICK_LEAVE  // falta por enfermedad
+}
+
+model EmployeeAuditLog {
+  id          Int               @id @default(autoincrement())
+  date        DateTime          @default(now())
+  type        EmployeeAuditType
+  hours       Float             // Cantidad de horas afectadas (+ o -)
+  reason      String            // Justificación
+  performedBy String            // Quién hizo el registro (Admin)
+
+  // Relación con el empleado
+  employeeId  Int
+  employee    Employee          @relation("EmployeeWorkAudits", fields: [employeeId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime          @default(now())
+}
+
 enum TimeBlockType {
   VACATION
   SICK
@@ -243,7 +302,7 @@ enum TimeBlockType {
 
 enum Role {
   ADMIN
-  ACCOUNTANT
+  CLIENT
   EMPLOYEE
 }
 

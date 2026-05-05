@@ -29,8 +29,11 @@ export async function GET(
             },
           },
         },
-        // INCLUIMOS LOS BLOQUES MANUALES (Punto 1 de la charla)
         timeBlocks: true, 
+        
+        // 🔥 NUEVAS INCLUSIONES PARA LAS PESTAÑAS
+        payrollRecords: true, // Trae los datos para la pestaña "Lohn & Kosten"
+        workAuditLogs: true,  // Trae los datos para la pestaña de Auditoría
       },
     })
 
@@ -62,11 +65,9 @@ export async function GET(
       totalPaidHours += (workedHours + travelHours)
     })
 
-    // 2. SUMAR BLOQUES DE TIEMPO MANUALES (Vacaciones, Cancelaciones pagadas, etc.)
-    // Esto es lo que permite "justificar" por qué un empleado llegó a sus 20h
+    // 2. SUMAR BLOQUES DE TIEMPO MANUALES
     employee.timeBlocks.forEach((block: any) => {
       totalPaidHours += block.duration
-      // También lo sumamos al "Ist-Stunden" para que el balance semanal no salga negativo
       totalWorkedHours += block.duration 
     })
 
@@ -114,6 +115,9 @@ export async function PUT(
         employmentType: body.employmentType,
         contractedHoursPerWeek: body.contractedHoursPerWeek ? parseFloat(body.contractedHoursPerWeek) : null,
         vacationDaysPerYear: body.vacationDaysPerYear ? parseInt(body.vacationDaysPerYear) : 20,
+        
+        // 🔥 NUEVO: Permite activar o desactivar al empleado
+        isActive: body.isActive !== undefined ? body.isActive : undefined,
       },
     })
 
