@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { signIn } from "next-auth/react"
+import { signIn, getSession } from "next-auth/react"
+import { getDashboardPathByRole } from "@/lib/role-redirect"
 import { useRouter } from "next/navigation"
 
 export default function LoginPage() {
@@ -19,20 +20,23 @@ export default function LoginPage() {
     const result = await signIn("credentials", {
       email,
       password,
-      redirect: true,
-      callbackUrl: "/admin/calendar",
+      redirect: false,
     })
 
     if (result?.error) {
       setError("Invalid credentials")
-    } else if (result?.url) {
-      router.push(result.url)
+      return
     }
+
+    const session = await getSession()
+    const role = session?.user?.role
+
+    router.push(getDashboardPathByRole(role))
   }
 
   return (
     <div className="bg-background-light dark:bg-background-dark min-h-screen flex flex-col font-display">
-      
+
       {/* Header */}
       <header className="w-full px-6 lg:px-12 py-6 flex items-center justify-between bg-white/50 dark:bg-background-dark/50 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-2 text-primary">

@@ -1,7 +1,14 @@
-import { prisma } from "@/lib/prisma"
+// frontend/app/api/clients/route.ts
+
 import { NextResponse } from "next/server"
 
+import { requireApiRole } from "@/lib/api-auth"
+import { prisma } from "@/lib/prisma"
+
 export async function GET(req: Request) {
+  const authError = await requireApiRole(["ADMIN"])
+  if (authError) return authError
+
   try {
     const { searchParams } = new URL(req.url)
     const search = searchParams.get("search")
@@ -25,9 +32,6 @@ export async function GET(req: Request) {
             ],
           }
         : undefined,
-      // REQUISITO JOSÉ: Orden jerárquico doble
-      // 1. Primero por Categoría (A, B, C...)
-      // 2. Luego por Código de cliente (108, 109, 110...)
       orderBy: [
         { category: "asc" },
         { clientCode: "asc" },
@@ -35,18 +39,30 @@ export async function GET(req: Request) {
     })
 
     return NextResponse.json(clients)
-
   } catch (error) {
     console.error("CLIENTS GET ERROR:", error)
-    return NextResponse.json([], { status: 500 })
+    return NextResponse.json(
+      { error: "Error fetching clients" },
+      { status: 500 }
+    )
   }
 }
 
 export async function POST(req: Request) {
+  const authError = await requireApiRole(["ADMIN"])
+  if (authError) return authError
+
   try {
     const body = await req.json()
-
-    const { clientCode, name, address, email, phone, category, clientType } = body
+    const {
+      clientCode,
+      name,
+      address,
+      email,
+      phone,
+      category,
+      clientType,
+    } = body
 
     if (!clientCode || !name) {
       return NextResponse.json(
@@ -73,14 +89,12 @@ export async function POST(req: Request) {
         address: address || null,
         email: email || null,
         phone: phone || null,
-        //  NUEVOS CAMPOS: Categoría y Tipo (Particular/Empresa)
         category: category || "C",
-        clientType: clientType || "PRIVAT", 
+        clientType: clientType || "PRIVAT",
       },
     })
 
     return NextResponse.json(client)
-
   } catch (error) {
     console.error("CLIENT CREATE ERROR:", error)
     return NextResponse.json(

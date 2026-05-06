@@ -47,7 +47,7 @@ export default function ClientsPage() {
     }
   }
 
-  // 🔥 2. FILTRADO (Usa useMemo para mayor velocidad)
+  //  2. FILTRADO (Usa useMemo para mayor velocidad)
   const filteredClients = useMemo(() => {
     return clients.filter((client) => {
       // Búsqueda de texto (Nombre, Email, Dirección o Código)
@@ -64,7 +64,7 @@ export default function ClientsPage() {
     })
   }, [clients, searchTerm, typeFilter])
 
-  // 🔥 3. ORDENAMIENTO (Ahora ordenamos los filtrados, no los originales)
+  //  3. ORDENAMIENTO (Ahora ordenamos los filtrados, no los originales)
   const categoryOrder = ["A", "B", "C", "D", "E", "Z"]
   const sortedClients = useMemo(() => {
     return [...filteredClients].sort((a, b) => {
@@ -77,7 +77,7 @@ export default function ClientsPage() {
     })
   }, [filteredClients]) // <-- El cambio clave está aquí
 
-  // 🔥 4. RESET DE PÁGINA (Si el admin busca algo, lo mandamos a la página 1)
+  //  4. RESET DE PÁGINA (Si el admin busca algo, lo mandamos a la página 1)
   useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm, typeFilter])

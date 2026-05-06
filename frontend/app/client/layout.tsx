@@ -18,7 +18,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   return (
     <div className="flex min-h-screen bg-[#f8fafc] font-sans">
       
-      {/* 💻 DESKTOP: SIDEBAR IZQUIERDA */}
+      {/* DESKTOP: SIDEBAR IZQUIERDA */}
       <aside className="hidden md:flex flex-col w-[260px] bg-white border-r border-slate-200 fixed h-full z-20">
         {/* Logo */}
         <div className="h-20 flex items-center px-8 border-b border-slate-100">
@@ -53,7 +53,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         </div>
       </aside>
 
-      {/* 📱 MOBILE: TOP HEADER */}
+      {/*  MOBILE: TOP HEADER */}
       <header className="md:hidden fixed top-0 w-full h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 z-20 flex items-center justify-between px-6">
         <div className="flex items-center gap-2 text-blue-600">
           <span className="material-symbols-outlined text-2xl font-black">cleaning_services</span>

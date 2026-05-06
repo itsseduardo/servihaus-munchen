@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import AdminCalendarTopbar from "@/components/admin/AdminCalendarTopbar"
 import WeeklyCalendar from "@/components/admin/WeeklyCalendar"
 import { useWeek } from "@/hooks/useWeek"
-import { ServiceType } from "@/public/types/service"
+import { ServiceType } from "@/types/service"
 
 export default function AdminCalendarPage() {
   const [currentWeek, setCurrentWeek] = useState(new Date())

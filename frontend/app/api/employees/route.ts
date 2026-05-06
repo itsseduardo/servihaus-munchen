@@ -1,11 +1,15 @@
-import { prisma } from "@/lib/prisma"
-import { NextResponse } from "next/server"
-import bcrypt from "bcryptjs" 
+// frontend/app/api/employees/route.ts
 
-// ======================
-// GET - Obtener empleados (Intacto)
-// ======================
+import { NextResponse } from "next/server"
+import bcrypt from "bcryptjs"
+
+import { requireApiRole } from "@/lib/api-auth"
+import { prisma } from "@/lib/prisma"
+
 export async function GET() {
+  const authError = await requireApiRole(["ADMIN"])
+  if (authError) return authError
+
   try {
     const employees = await prisma.employee.findMany({
       orderBy: [
@@ -14,7 +18,9 @@ export async function GET() {
       ],
       include: {
         _count: {
-          select: { assignments: true },
+          select: {
+            assignments: true,
+          },
         },
       },
     })
@@ -29,7 +35,7 @@ export async function GET() {
       phone: emp.phone,
       hourlyRate: emp.hourlyRate,
       employmentType: emp.employmentType,
-      contractedHoursPerWeek: emp.contractedHoursPerWeek, 
+      contractedHoursPerWeek: emp.contractedHoursPerWeek,
       vacationDaysPerYear: emp.vacationDaysPerYear,
       userId: emp.userId,
       hasLogin: !!emp.userId,
@@ -38,7 +44,6 @@ export async function GET() {
     }))
 
     return NextResponse.json(formatted)
-
   } catch (error) {
     console.error("EMPLOYEES GET ERROR:", error)
     return NextResponse.json(
@@ -48,43 +53,46 @@ export async function GET() {
   }
 }
 
-// ======================
-// POST - Crear empleado (Actualizado con Login)
-// ======================
 export async function POST(req: Request) {
+  const authError = await requireApiRole(["ADMIN"])
+  if (authError) return authError
+
   try {
     const body = await req.json()
 
-    //   Validamos que también envíen la contraseña
-    if (!body.firstName || !body.lastName || !body.profession || !body.email || !body.password) {
+    if (
+      !body.firstName ||
+      !body.lastName ||
+      !body.profession ||
+      !body.email ||
+      !body.password
+    ) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       )
     }
 
-    //  Verificamos que el email no exista en la tabla User
-    const existingUser = await prisma.user.findUnique({ where: { email: body.email } })
+    const existingUser = await prisma.user.findUnique({
+      where: { email: body.email },
+    })
+
     if (existingUser) {
       return NextResponse.json(
-        { error: "El correo ya está registrado en el sistema" }, 
+        { error: "El correo ya está registrado en el sistema" },
         { status: 400 }
       )
     }
 
-    //   Encriptamos la contraseña y armamos el nombre completo
     const hashedPassword = await bcrypt.hash(body.password, 10)
     const fullName = `${body.firstName} ${body.lastName}`
 
-    //  Creación Anidada (User + Employee) conservando tu lógica de parsing
     const newUserAndEmployee = await prisma.user.create({
       data: {
         name: fullName,
         email: body.email,
         password: hashedPassword,
         role: "EMPLOYEE",
-        
-        // Creamos al empleado asociado en el mismo paso
         employee: {
           create: {
             firstName: body.firstName,
@@ -92,28 +100,23 @@ export async function POST(req: Request) {
             profession: body.profession,
             email: body.email,
             phone: body.phone || null,
-            
-            // Conservamos tu excelente lógica de formateo numérico
             hourlyRate: body.hourlyRate ? parseFloat(body.hourlyRate) : null,
-            employmentType: body.employmentType || "MINIJOB_538", 
-            contractedHoursPerWeek: body.contractedHoursPerWeek 
-              ? parseFloat(body.contractedHoursPerWeek) 
+            employmentType: body.employmentType || "MINIJOB_538",
+            contractedHoursPerWeek: body.contractedHoursPerWeek
+              ? parseFloat(body.contractedHoursPerWeek)
               : null,
-            vacationDaysPerYear: body.vacationDaysPerYear 
-              ? parseInt(body.vacationDaysPerYear) 
-              : 20, // Mínimo legal por defecto
-          }
-        }
+            vacationDaysPerYear: body.vacationDaysPerYear
+              ? parseInt(body.vacationDaysPerYear)
+              : 20,
+          },
+        },
       },
-      // Le pedimos a Prisma que nos devuelva también los datos del empleado recién creado
       include: {
-        employee: true 
-      }
+        employee: true,
+      },
     })
 
-    // Devolvemos el empleado creado (que está dentro del objeto newUserAndEmployee)
     return NextResponse.json(newUserAndEmployee.employee)
-
   } catch (error) {
     console.error("EMPLOYEE CREATE ERROR:", error)
     return NextResponse.json(
