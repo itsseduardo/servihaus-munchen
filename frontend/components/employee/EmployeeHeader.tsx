@@ -11,18 +11,19 @@ interface Props {
 export default function EmployeeHeader({ tasksCount, activeTab, onTabChange }: Props) {
   // 1. Traemos la sesión real
   const { data: session } = useSession()
-  
+
   // 2. Extraemos el nombre o ponemos un fallback
   const userName = session?.user?.name || "Mitarbeiter"
-  
+
   // 3. Generamos las iniciales (Ej: "Juan Perez" -> "JP")
   const initials = userName
     .split(" ")
-    .map((n: any[]) => n[0])
+    .filter(Boolean)
+    .map((name: string) => name[0])
     .join("")
     .substring(0, 2)
     .toUpperCase()
-
+    
   return (
     <header className="sticky top-0 z-20 bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between mb-4">
@@ -43,7 +44,7 @@ export default function EmployeeHeader({ tasksCount, activeTab, onTabChange }: P
             {tasksCount} Jobs Heute
           </p>
         </div>
-        
+
         {/* INICIALES DINÁMICAS */}
         <div className="w-12 h-12 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center font-black text-slate-600">
           {initials}
@@ -52,13 +53,13 @@ export default function EmployeeHeader({ tasksCount, activeTab, onTabChange }: P
 
       {/* TABS (Se mantienen igual) */}
       <div className="flex border-b border-gray-100 mt-6 gap-6">
-        <button 
+        <button
           onClick={() => onTabChange("today")}
           className={`flex flex-col items-center justify-center border-b-[3px] pb-3 pt-2 w-1/2 transition-colors ${activeTab === 'today' ? 'border-[#1173d4] text-[#1173d4]' : 'border-transparent text-gray-500'}`}
         >
           <p className="text-sm font-bold tracking-wide">Heute (Jobs)</p>
         </button>
-        <button 
+        <button
           onClick={() => onTabChange("history")}
           className={`flex flex-col items-center justify-center border-b-[3px] pb-3 pt-2 w-1/2 transition-colors ${activeTab === 'history' ? 'border-[#1173d4] text-[#1173d4]' : 'border-transparent text-gray-500'}`}
         >
