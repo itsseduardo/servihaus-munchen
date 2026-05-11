@@ -46,7 +46,14 @@ export default function Footer() {
 
       <div className="max-w-300 mx-auto mt-12 pt-8 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-400 flex justify-between">
         <p>© 2026 ServiHausMunchen. Alle Rechte vorbehalten.</p>
-        <p>Dev by ItssEduardo.</p>
+        <a
+          href="https://portfolio-jesus-nu.vercel.app/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-bold text-slate-500 transition-colors hover:text-blue-600"
+        >
+          Dev by itsseduardo
+        </a>
       </div>
     </footer>
   );

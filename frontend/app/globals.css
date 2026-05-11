@@ -43,3 +43,7 @@
   justify-content: center;
   vertical-align: middle;
 }
+
+html {
+  scroll-behavior: smooth;
+}
