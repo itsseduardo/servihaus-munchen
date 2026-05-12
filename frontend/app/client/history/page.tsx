@@ -68,10 +68,11 @@ function downloadCSV(rows: ServiceHistoryItem[]) {
     const headers = [
         "Datum",
         "Uhrzeit",
+        "Code",
         "Service",
         "Kategorie",
         "Dauer",
-        "Personal",
+        "Team",
         "Status",
         "Notizen",
     ]

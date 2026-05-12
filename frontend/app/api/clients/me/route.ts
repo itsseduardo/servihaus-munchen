@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth-options"
 import { prisma } from "@/lib/prisma"
 
+const cancelledStatuses = ["cancelled", "canceled", "CANCELLED", "CANCELED"]
+
 function splitAddress(address?: string | null) {
   if (!address) {
     return {
@@ -73,6 +75,9 @@ export async function GET() {
                 date: {
                   gte: new Date(),
                 },
+                status: {
+                  notIn: cancelledStatuses,
+                },
               },
               orderBy: [
                 { date: "asc" },
@@ -106,6 +111,9 @@ export async function GET() {
     const totalServices = await prisma.service.count({
       where: {
         clientId: client.id,
+        status: {
+          notIn: cancelledStatuses,
+        },
       },
     })
 
@@ -115,6 +123,9 @@ export async function GET() {
         date: {
           gte: new Date(),
         },
+        status: {
+          notIn: cancelledStatuses,
+        },
       },
     })
 
@@ -123,10 +134,10 @@ export async function GET() {
     const staff =
       nextService?.assignments?.length
         ? nextService.assignments
-            .map((assignment) =>
-              `${assignment.employee.firstName} ${assignment.employee.lastName}`
-            )
-            .join(" & ")
+          .map((assignment) =>
+            `${assignment.employee.firstName} ${assignment.employee.lastName}`
+          )
+          .join(" & ")
         : "Noch nicht zugewiesen"
 
     return NextResponse.json({
@@ -151,25 +162,25 @@ export async function GET() {
 
       nextService: nextService
         ? {
-            id: nextService.id,
-            date: nextService.date.toLocaleDateString("de-DE", {
-              day: "2-digit",
-              month: "short",
-            }),
-            day: nextService.date.toLocaleDateString("de-DE", {
-              weekday: "long",
-            }),
-            time: formatServiceTime(
-              nextService.startTime,
-              nextService.teamDuration
-            ),
-            type:
-              nextService.serviceCode?.description ||
-              nextService.code ||
-              "Reinigung",
-            staff,
-            status: nextService.status || "confirmed",
-          }
+          id: nextService.id,
+          date: nextService.date.toLocaleDateString("de-DE", {
+            day: "2-digit",
+            month: "short",
+          }),
+          day: nextService.date.toLocaleDateString("de-DE", {
+            weekday: "long",
+          }),
+          time: formatServiceTime(
+            nextService.startTime,
+            nextService.teamDuration
+          ),
+          type:
+            nextService.serviceCode?.description ||
+            nextService.code ||
+            "Reinigung",
+          staff,
+          status: nextService.status || "confirmed",
+        }
         : null,
 
       stats: {

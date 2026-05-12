@@ -78,6 +78,10 @@ export async function GET() {
 
       return {
         id: service.id,
+        code:
+          service.serviceCode?.code ||
+          service.code ||
+          `S-${service.id}`,
         dateIso: service.date.toISOString(),
         dateLabel: service.date.toLocaleDateString("de-DE", {
           day: "2-digit",
@@ -86,12 +90,21 @@ export async function GET() {
         }),
         timeLabel: formatTime(service.startTime),
         serviceType:
-          service.serviceCode?.description || service.code || "Reinigung",
-        category: service.code || "Allgemein",
+          service.serviceCode?.description ||
+          service.code ||
+          "Reinigung",
+        category:
+          service.serviceCode?.code ||
+          service.code ||
+          "Allgemein",
         durationLabel: formatDuration(service.teamDuration),
         durationValue: service.teamDuration ?? 0,
         professionals,
         primaryProfessional: professionals[0] || "Nicht zugewiesen",
+        fullTeam:
+          professionals.length > 0
+            ? professionals.join(" · ")
+            : "Nicht zugewiesen",
         status: service.status || "COMPLETED",
         notes: service.notes || "",
       }

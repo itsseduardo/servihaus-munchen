@@ -1,19 +1,62 @@
-import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
+import { getServerSession } from "next-auth"
+
+import { authOptions } from "@/lib/auth-options"
+import { prisma } from "@/lib/prisma"
 
 export async function GET() {
   try {
-    const session = await getServerSession()
-    if (!session?.user?.email) return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "No autorizado" },
+        { status: 401 }
+      )
+    }
+
+    if (session.user.role !== "EMPLOYEE") {
+      return NextResponse.json(
+        { error: "No tienes permisos para acceder a este recurso" },
+        { status: 403 }
+      )
+    }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { employee: true }
+      where: {
+        id: session.user.id,
+      },
+      include: {
+        employee: true,
+      },
     })
 
-    return NextResponse.json(user?.employee || null)
+    if (!user?.employee) {
+      return NextResponse.json(
+        { error: "Empleado no encontrado" },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      id: user.employee.id,
+      userId: user.id,
+      firstName: user.employee.firstName,
+      lastName: user.employee.lastName,
+      fullName: `${user.employee.firstName} ${user.employee.lastName}`,
+      email: user.employee.email,
+      phone: user.employee.phone,
+      profession: user.employee.profession,
+      employmentType: user.employee.employmentType,
+      isActive: user.employee.isActive,
+      active: user.employee.active,
+    })
   } catch (error) {
-    return NextResponse.json({ error: "Error del servidor" }, { status: 500 })
+    console.error("EMPLOYEE ME ERROR:", error)
+
+    return NextResponse.json(
+      { error: "Error del servidor" },
+      { status: 500 }
+    )
   }
 }

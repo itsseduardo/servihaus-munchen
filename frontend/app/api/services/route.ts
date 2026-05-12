@@ -26,9 +26,13 @@ export async function POST(req: Request) {
 
     // 2. PROCESAMIENTO DE FECHAS
     const [year, month, day] = date.split("-").map(Number)
-    const serviceDate = new Date(Date.UTC(year, month - 1, day))
     const [hours, minutes] = time.split(":").map(Number)
-    
+
+    // Fecha calendario, sin UTC, para evitar desfases de día.
+    const serviceDate = new Date(year, month - 1, day, 12, 0, 0, 0)
+    serviceDate.setHours(0, 0, 0, 0)
+
+    // Hora real del servicio.
     const startTime = new Date(year, month - 1, day, hours, minutes, 0, 0)
 
     // 3. OBTENER O CREAR CLIENTE
@@ -54,7 +58,17 @@ export async function POST(req: Request) {
         travelTime: tTime,                    // <-- NUEVO
         recurrenceRule: isRecurring ? recurrenceRule : null,
         recurrenceInterval: isRecurring ? interval : null,
-        recurrenceEnd: isRecurring && recurrenceEnd ? new Date(recurrenceEnd) : null,
+        recurrenceEnd:
+          isRecurring && recurrenceEnd
+            ? (() => {
+              const [endYear, endMonth, endDay] = recurrenceEnd
+                .split("-")
+                .map(Number)
+
+              const end = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999)
+              return end
+            })()
+            : null,
         address,
         status: "assigned",
         requiresKey: requiresKey || false,
@@ -69,31 +83,62 @@ export async function POST(req: Request) {
 
     // 5. LÓGICA DE RECURRENCIA CORREGIDA
     if (isRecurring && recurrenceRule && recurrenceEnd) {
-      const stopDate = new Date(recurrenceEnd)
+      const [endYear, endMonth, endDay] = recurrenceEnd.split("-").map(Number)
+      const stopDate = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999)
       let currentPointer = new Date(startTime)
-      let safetyCounter = 0 
-      const MAX_RECURRENCES = 100 
+      let safetyCounter = 0
+      const MAX_RECURRENCES = 100
 
       // Caso especial: SEMANAL (WEEKLY) con días específicos
       if (recurrenceRule === "WEEKLY" && recurrenceDays?.length > 0) {
-        const weekdayMap: Record<string, number> = { SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6 }
-        let weekCursor = new Date(serviceDate)
+        const weekdayMap: Record<string, number> = {
+          SUN: 0,
+          MON: 1,
+          TUE: 2,
+          WED: 3,
+          THU: 4,
+          FRI: 5,
+          SAT: 6,
+        }
+
+        const baseWeekStart = new Date(serviceDate)
+        baseWeekStart.setHours(0, 0, 0, 0)
+
+        let weekCursor = new Date(baseWeekStart)
 
         while (weekCursor <= stopDate && safetyCounter < MAX_RECURRENCES) {
           for (const dayCode of recurrenceDays) {
             const targetDay = weekdayMap[dayCode]
+
+            if (targetDay === undefined) continue
+
             const tempDate = new Date(weekCursor)
-            const diff = targetDay - tempDate.getDay()
+            tempDate.setHours(0, 0, 0, 0)
+
+            const currentDay = tempDate.getDay()
+            const diff = targetDay - currentDay
+
             tempDate.setDate(tempDate.getDate() + diff)
+            tempDate.setHours(0, 0, 0, 0)
 
             if (tempDate > serviceDate && tempDate <= stopDate) {
-              await createRecurringInstance(tempDate, hours, minutes, baseService.id, client.id, body, employees);
+              await createRecurringInstance(
+                tempDate,
+                hours,
+                minutes,
+                baseService.id,
+                client.id,
+                body,
+                employees
+              )
+
               safetyCounter++
             }
           }
-          weekCursor.setDate(weekCursor.getDate() + (7 * interval))
+
+          weekCursor.setDate(weekCursor.getDate() + 7 * interval)
         }
-      } 
+      }
       // Otros casos: DIARIO, QUINCENAL (BIWEEKLY), MENSUAL
       else {
         while (safetyCounter < MAX_RECURRENCES) {
@@ -103,7 +148,7 @@ export async function POST(req: Request) {
           else break
 
           if (currentPointer > stopDate) break
-          
+
           await createRecurringInstance(currentPointer, hours, minutes, baseService.id, client.id, body, employees);
           safetyCounter++
         }
@@ -122,7 +167,7 @@ export async function POST(req: Request) {
 async function createRecurringInstance(date: Date, h: number, m: number, parentId: number, clientId: number, body: any, employees: number[]) {
   const instanceDate = new Date(date)
   instanceDate.setHours(0, 0, 0, 0)
-  
+
   const instanceStart = new Date(date)
   instanceStart.setHours(h, m, 0, 0)
 
