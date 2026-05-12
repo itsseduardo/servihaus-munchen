@@ -10,9 +10,9 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params
-    const clientId = parseInt(id)
+    const clientId = Number(id)
 
-    if (isNaN(clientId)) {
+    if (!Number.isInteger(clientId)) {
       return NextResponse.json(
         { error: "Invalid client id" },
         { status: 400 }
@@ -20,10 +20,23 @@ export async function GET(
     }
 
     const client = await prisma.client.findUnique({
-      where: { id: clientId },
+      where: {
+        id: clientId,
+      },
       include: {
         services: {
-          orderBy: { date: "desc" },
+          include: {
+            serviceCode: true,
+            assignments: {
+              include: {
+                employee: true,
+              },
+            },
+          },
+          orderBy: [
+            { date: "desc" },
+            { startTime: "desc" },
+          ],
         },
       },
     })
@@ -36,9 +49,9 @@ export async function GET(
     }
 
     return NextResponse.json(client)
-
   } catch (error) {
     console.error("CLIENT DETAIL ERROR:", error)
+
     return NextResponse.json(
       { error: "Server error" },
       { status: 500 }
@@ -47,7 +60,7 @@ export async function GET(
 }
 
 //
-// UPDATE CLIENT (incluye category y clientType)
+// UPDATE CLIENT
 //
 export async function PUT(
   req: Request,
@@ -55,9 +68,9 @@ export async function PUT(
 ) {
   try {
     const { id } = await context.params
-    const clientId = parseInt(id)
+    const clientId = Number(id)
 
-    if (isNaN(clientId)) {
+    if (!Number.isInteger(clientId)) {
       return NextResponse.json(
         { error: "Invalid client id" },
         { status: 400 }
@@ -73,19 +86,19 @@ export async function PUT(
     if (body.email !== undefined) updateData.email = body.email
     if (body.phone !== undefined) updateData.phone = body.phone
     if (body.category !== undefined) updateData.category = body.category
-    
-    // Agregamos clientType al objeto de actualización
     if (body.clientType !== undefined) updateData.clientType = body.clientType
 
     const updated = await prisma.client.update({
-      where: { id: clientId },
+      where: {
+        id: clientId,
+      },
       data: updateData,
     })
 
     return NextResponse.json(updated)
-
   } catch (error) {
     console.error("CLIENT UPDATE ERROR:", error)
+
     return NextResponse.json(
       { error: "Server error" },
       { status: 500 }
@@ -102,9 +115,9 @@ export async function DELETE(
 ) {
   try {
     const { id } = await context.params
-    const clientId = parseInt(id)
+    const clientId = Number(id)
 
-    if (isNaN(clientId)) {
+    if (!Number.isInteger(clientId)) {
       return NextResponse.json(
         { error: "Invalid client id" },
         { status: 400 }
@@ -112,13 +125,15 @@ export async function DELETE(
     }
 
     await prisma.client.delete({
-      where: { id: clientId },
+      where: {
+        id: clientId,
+      },
     })
 
     return NextResponse.json({ success: true })
-
   } catch (error) {
     console.error("CLIENT DELETE ERROR:", error)
+
     return NextResponse.json(
       { error: "Delete failed" },
       { status: 500 }

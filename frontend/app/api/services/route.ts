@@ -1,186 +1,118 @@
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 
-export async function POST(req: Request) {
-  try {
-    const body = await req.json()
-
-    const {
-      clientId, clientCode, clientName, serviceCodeId,
-      date, time, duration, billedHours, teamDuration,
-      address, requiresKey, employees, notes, importantNotes,
-      isRecurring, recurrenceRule, recurrenceInterval,
-      recurrenceEnd, recurrenceDays,
-      pricingModel, // <-- NUEVO: TIME o FIXED
-      travelTime    // <-- NUEVO: Tiempo de desplazamiento
-    } = body
-
-    const durationHours = Number(duration)
-    const interval = Number(recurrenceInterval) || 1
-    const tTime = Number(travelTime) || 0
-
-    // 1. VALIDACIÓN INICIAL
-    if (!clientName || !address || !date || !time || isNaN(durationHours) || durationHours <= 0) {
-      return NextResponse.json({ error: "Missing or invalid fields" }, { status: 400 })
-    }
-
-    // 2. PROCESAMIENTO DE FECHAS
-    const [year, month, day] = date.split("-").map(Number)
-    const [hours, minutes] = time.split(":").map(Number)
-
-    // Fecha calendario, sin UTC, para evitar desfases de día.
-    const serviceDate = new Date(year, month - 1, day, 12, 0, 0, 0)
-    serviceDate.setHours(0, 0, 0, 0)
-
-    // Hora real del servicio.
-    const startTime = new Date(year, month - 1, day, hours, minutes, 0, 0)
-
-    // 3. OBTENER O CREAR CLIENTE
-    let client = clientId ? await prisma.client.findUnique({ where: { id: clientId } }) : null;
-    if (!client && clientCode) client = await prisma.client.findUnique({ where: { clientCode } });
-    if (!client) {
-      if (!clientCode) return NextResponse.json({ error: "Client code required" }, { status: 400 });
-      client = await prisma.client.create({
-        data: { clientCode, name: clientName, address: address || null }
-      });
-    }
-
-    // 4. CREAR EL SERVICIO BASE (EL PRIMERO)
-    const baseService = await prisma.service.create({
-      data: {
-        serviceCodeId: serviceCodeId ? Number(serviceCodeId) : null,
-        date: serviceDate,
-        startTime,
-        duration: durationHours,
-        billedHours: pricingModel === "FIXED" ? 0 : (billedHours ?? durationHours),
-        teamDuration: teamDuration ?? durationHours,
-        pricingModel: pricingModel || "TIME", // <-- NUEVO
-        travelTime: tTime,                    // <-- NUEVO
-        recurrenceRule: isRecurring ? recurrenceRule : null,
-        recurrenceInterval: isRecurring ? interval : null,
-        recurrenceEnd:
-          isRecurring && recurrenceEnd
-            ? (() => {
-              const [endYear, endMonth, endDay] = recurrenceEnd
-                .split("-")
-                .map(Number)
-
-              const end = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999)
-              return end
-            })()
-            : null,
-        address,
-        status: "assigned",
-        requiresKey: requiresKey || false,
-        notes: notes || null,
-        importantNotes: importantNotes || null,
-        clientId: client.id,
-        assignments: employees?.length ? {
-          create: employees.map((id: number) => ({ employee: { connect: { id } } }))
-        } : undefined,
-      },
-    })
-
-    // 5. LÓGICA DE RECURRENCIA CORREGIDA
-    if (isRecurring && recurrenceRule && recurrenceEnd) {
-      const [endYear, endMonth, endDay] = recurrenceEnd.split("-").map(Number)
-      const stopDate = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999)
-      let currentPointer = new Date(startTime)
-      let safetyCounter = 0
-      const MAX_RECURRENCES = 100
-
-      // Caso especial: SEMANAL (WEEKLY) con días específicos
-      if (recurrenceRule === "WEEKLY" && recurrenceDays?.length > 0) {
-        const weekdayMap: Record<string, number> = {
-          SUN: 0,
-          MON: 1,
-          TUE: 2,
-          WED: 3,
-          THU: 4,
-          FRI: 5,
-          SAT: 6,
-        }
-
-        const baseWeekStart = new Date(serviceDate)
-        baseWeekStart.setHours(0, 0, 0, 0)
-
-        let weekCursor = new Date(baseWeekStart)
-
-        while (weekCursor <= stopDate && safetyCounter < MAX_RECURRENCES) {
-          for (const dayCode of recurrenceDays) {
-            const targetDay = weekdayMap[dayCode]
-
-            if (targetDay === undefined) continue
-
-            const tempDate = new Date(weekCursor)
-            tempDate.setHours(0, 0, 0, 0)
-
-            const currentDay = tempDate.getDay()
-            const diff = targetDay - currentDay
-
-            tempDate.setDate(tempDate.getDate() + diff)
-            tempDate.setHours(0, 0, 0, 0)
-
-            if (tempDate > serviceDate && tempDate <= stopDate) {
-              await createRecurringInstance(
-                tempDate,
-                hours,
-                minutes,
-                baseService.id,
-                client.id,
-                body,
-                employees
-              )
-
-              safetyCounter++
-            }
-          }
-
-          weekCursor.setDate(weekCursor.getDate() + 7 * interval)
-        }
-      }
-      // Otros casos: DIARIO, QUINCENAL (BIWEEKLY), MENSUAL
-      else {
-        while (safetyCounter < MAX_RECURRENCES) {
-          if (recurrenceRule === "DAILY") currentPointer.setDate(currentPointer.getDate() + interval)
-          else if (recurrenceRule === "BIWEEKLY") currentPointer.setDate(currentPointer.getDate() + 14)
-          else if (recurrenceRule === "MONTHLY") currentPointer.setMonth(currentPointer.getMonth() + interval)
-          else break
-
-          if (currentPointer > stopDate) break
-
-          await createRecurringInstance(currentPointer, hours, minutes, baseService.id, client.id, body, employees);
-          safetyCounter++
-        }
-      }
-    }
-
-    return NextResponse.json(baseService)
-
-  } catch (error) {
-    console.error("SERVICE CREATE ERROR:", error)
-    return NextResponse.json({ error: "Server error" }, { status: 500 })
-  }
+const WEEKDAY_MAP: Record<string, number> = {
+  SUN: 0,
+  MON: 1,
+  TUE: 2,
+  WED: 3,
+  THU: 4,
+  FRI: 5,
+  SAT: 6,
 }
 
-// FUNCIÓN AUXILIAR ACTUALIZADA
-async function createRecurringInstance(date: Date, h: number, m: number, parentId: number, clientId: number, body: any, employees: number[]) {
-  const instanceDate = new Date(date)
-  instanceDate.setHours(0, 0, 0, 0)
+function parseDateParts(dateString: string) {
+  const [year, month, day] = dateString.slice(0, 10).split("-").map(Number)
 
-  const instanceStart = new Date(date)
-  instanceStart.setHours(h, m, 0, 0)
+  if (!year || !month || !day) {
+    throw new Error("Invalid date")
+  }
 
-  return await prisma.service.create({
+  return { year, month, day }
+}
+
+function makeUtcDateOnly(dateString: string) {
+  const { year, month, day } = parseDateParts(dateString)
+
+  // Guardamos la fecha calendario al mediodía UTC para evitar que
+  // se visualice como el día anterior en zonas horarias negativas.
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0))
+}
+
+function makeUtcDateStart(dateString: string) {
+  const { year, month, day } = parseDateParts(dateString)
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+}
+
+function makeUtcDateEnd(dateString: string) {
+  const { year, month, day } = parseDateParts(dateString)
+  return new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999))
+}
+
+function makeUtcDateTime(dateString: string, timeString: string) {
+  const { year, month, day } = parseDateParts(dateString)
+  const [hours, minutes] = timeString.split(":").map(Number)
+
+  return new Date(
+    Date.UTC(year, month - 1, day, hours || 0, minutes || 0, 0, 0)
+  )
+}
+
+function cloneUtcDateOnly(date: Date) {
+  return new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate(),
+      12,
+      0,
+      0,
+      0
+    )
+  )
+}
+
+function buildStartTimeFromDate(date: Date, hours: number, minutes: number) {
+  return new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate(),
+      hours || 0,
+      minutes || 0,
+      0,
+      0
+    )
+  )
+}
+
+function addUtcDays(date: Date, days: number) {
+  const copy = cloneUtcDateOnly(date)
+  copy.setUTCDate(copy.getUTCDate() + days)
+  return copy
+}
+
+function addUtcMonths(date: Date, months: number) {
+  const copy = cloneUtcDateOnly(date)
+  copy.setUTCMonth(copy.getUTCMonth() + months)
+  return copy
+}
+
+async function createRecurringInstance(
+  date: Date,
+  hours: number,
+  minutes: number,
+  parentId: number,
+  clientId: number,
+  body: any,
+  employees: number[]
+) {
+  const instanceDate = cloneUtcDateOnly(date)
+  const instanceStart = buildStartTimeFromDate(instanceDate, hours, minutes)
+
+  return prisma.service.create({
     data: {
       serviceCodeId: body.serviceCodeId ? Number(body.serviceCodeId) : null,
       date: instanceDate,
       startTime: instanceStart,
       duration: Number(body.duration),
-      billedHours: body.pricingModel === "FIXED" ? 0 : Number(body.billedHours || body.duration),
+      billedHours:
+        body.pricingModel === "FIXED"
+          ? 0
+          : Number(body.billedHours || body.duration),
       teamDuration: Number(body.teamDuration || body.duration),
-      pricingModel: body.pricingModel || "TIME", // Herencia de modelo
-      travelTime: Number(body.travelTime) || 0, // Herencia de tiempo de viaje
+      pricingModel: body.pricingModel || "TIME",
+      travelTime: Number(body.travelTime) || 0,
       parentServiceId: parentId,
       address: body.address,
       status: "assigned",
@@ -188,55 +120,266 @@ async function createRecurringInstance(date: Date, h: number, m: number, parentI
       notes: body.notes || null,
       importantNotes: body.importantNotes || null,
       clientId,
-      assignments: employees?.length ? {
-        create: employees.map((id: number) => ({ employee: { connect: { id } } }))
-      } : undefined,
+      assignments: employees?.length
+        ? {
+            create: employees.map((id: number) => ({
+              employee: {
+                connect: { id },
+              },
+            })),
+          }
+        : undefined,
     },
   })
 }
 
-// GET (Mantiene la funcionalidad de reporte pero preparado para los nuevos campos)
+export async function POST(req: Request) {
+  try {
+    const body = await req.json()
+
+    const {
+      clientId,
+      clientCode,
+      clientName,
+      serviceCodeId,
+      date,
+      time,
+      duration,
+      billedHours,
+      teamDuration,
+      address,
+      requiresKey,
+      employees,
+      notes,
+      importantNotes,
+      isRecurring,
+      recurrenceRule,
+      recurrenceInterval,
+      recurrenceEnd,
+      recurrenceDays,
+      pricingModel,
+      travelTime,
+    } = body
+
+    const durationHours = Number(duration)
+    const interval = Number(recurrenceInterval) || 1
+    const tTime = Number(travelTime) || 0
+
+    if (
+      !clientName ||
+      !address ||
+      !date ||
+      !time ||
+      isNaN(durationHours) ||
+      durationHours <= 0
+    ) {
+      return NextResponse.json(
+        { error: "Missing or invalid fields" },
+        { status: 400 }
+      )
+    }
+
+    const [hours, minutes] = time.split(":").map(Number)
+
+    const serviceDate = makeUtcDateOnly(date)
+    const startTime = makeUtcDateTime(date, time)
+
+    let client = clientId
+      ? await prisma.client.findUnique({
+          where: { id: Number(clientId) },
+        })
+      : null
+
+    if (!client && clientCode) {
+      client = await prisma.client.findUnique({
+        where: { clientCode },
+      })
+    }
+
+    if (!client) {
+      if (!clientCode) {
+        return NextResponse.json(
+          { error: "Client code required" },
+          { status: 400 }
+        )
+      }
+
+      client = await prisma.client.create({
+        data: {
+          clientCode,
+          name: clientName,
+          address: address || null,
+        },
+      })
+    }
+
+    const recurrenceEndDate =
+      isRecurring && recurrenceEnd ? makeUtcDateEnd(recurrenceEnd) : null
+
+    const baseService = await prisma.service.create({
+      data: {
+        serviceCodeId: serviceCodeId ? Number(serviceCodeId) : null,
+        date: serviceDate,
+        startTime,
+        duration: durationHours,
+        billedHours:
+          pricingModel === "FIXED" ? 0 : billedHours ?? durationHours,
+        teamDuration: teamDuration ?? durationHours,
+        pricingModel: pricingModel || "TIME",
+        travelTime: tTime,
+        recurrenceRule: isRecurring ? recurrenceRule : null,
+        recurrenceInterval: isRecurring ? interval : null,
+        recurrenceEnd: recurrenceEndDate,
+        address,
+        status: "assigned",
+        requiresKey: requiresKey || false,
+        notes: notes || null,
+        importantNotes: importantNotes || null,
+        clientId: client.id,
+        assignments: employees?.length
+          ? {
+              create: employees.map((id: number) => ({
+                employee: {
+                  connect: { id },
+                },
+              })),
+            }
+          : undefined,
+      },
+    })
+
+    if (isRecurring && recurrenceRule && recurrenceEndDate) {
+      let safetyCounter = 0
+      const MAX_RECURRENCES = 100
+      const employeeIds = Array.isArray(employees) ? employees : []
+
+      if (recurrenceRule === "WEEKLY" && recurrenceDays?.length > 0) {
+        let weekCursor = cloneUtcDateOnly(serviceDate)
+
+        while (weekCursor <= recurrenceEndDate && safetyCounter < MAX_RECURRENCES) {
+          for (const dayCode of recurrenceDays) {
+            const targetDay = WEEKDAY_MAP[dayCode]
+
+            if (targetDay === undefined) continue
+
+            const tempDate = cloneUtcDateOnly(weekCursor)
+
+            const currentDay = tempDate.getUTCDay()
+            const diff = targetDay - currentDay
+
+            tempDate.setUTCDate(tempDate.getUTCDate() + diff)
+            tempDate.setUTCHours(12, 0, 0, 0)
+
+            if (tempDate > serviceDate && tempDate <= recurrenceEndDate) {
+              await createRecurringInstance(
+                tempDate,
+                hours,
+                minutes,
+                baseService.id,
+                client.id,
+                body,
+                employeeIds
+              )
+
+              safetyCounter++
+            }
+          }
+
+          weekCursor = addUtcDays(weekCursor, 7 * interval)
+        }
+      } else {
+        let currentPointer = cloneUtcDateOnly(serviceDate)
+
+        while (safetyCounter < MAX_RECURRENCES) {
+          if (recurrenceRule === "DAILY") {
+            currentPointer = addUtcDays(currentPointer, interval)
+          } else if (recurrenceRule === "BIWEEKLY") {
+            currentPointer = addUtcDays(currentPointer, 14)
+          } else if (recurrenceRule === "MONTHLY") {
+            currentPointer = addUtcMonths(currentPointer, interval)
+          } else {
+            break
+          }
+
+          if (currentPointer > recurrenceEndDate) break
+
+          await createRecurringInstance(
+            currentPointer,
+            hours,
+            minutes,
+            baseService.id,
+            client.id,
+            body,
+            employeeIds
+          )
+
+          safetyCounter++
+        }
+      }
+    }
+
+    return NextResponse.json(baseService)
+  } catch (error) {
+    console.error("SERVICE CREATE ERROR:", error)
+
+    return NextResponse.json(
+      { error: "Server error" },
+      { status: 500 }
+    )
+  }
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const dateParam = searchParams.get("date")
 
-    if (!dateParam) return NextResponse.json([])
+    if (!dateParam) {
+      return NextResponse.json([])
+    }
 
-    const parsedDate = new Date(dateParam)
-    if (isNaN(parsedDate.getTime())) return NextResponse.json([])
+    const dateKey = dateParam.slice(0, 10)
 
-    const start = new Date(parsedDate)
-    start.setHours(0, 0, 0, 0)
-    const end = new Date(parsedDate)
-    end.setHours(23, 59, 59, 999)
+    const start = makeUtcDateStart(dateKey)
+    const end = makeUtcDateEnd(dateKey)
 
     const services = await prisma.service.findMany({
       where: {
-        date: { gte: start, lte: end },
+        date: {
+          gte: start,
+          lte: end,
+        },
       },
       include: {
         client: true,
         serviceCode: true,
-        assignments: { include: { employee: true } },
+        assignments: {
+          include: {
+            employee: true,
+          },
+        },
       },
-      orderBy: { startTime: "asc" },
+      orderBy: {
+        startTime: "asc",
+      },
     })
 
-    const formatted = services.map(service => ({
+    const formatted = services.map((service) => ({
       ...service,
       time: service.startTime
         ? service.startTime.toLocaleTimeString("de-DE", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        })
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+            timeZone: "UTC",
+          })
         : null,
     }))
 
     return NextResponse.json(formatted)
   } catch (error) {
     console.error("GET ERROR:", error)
+
     return NextResponse.json([], { status: 200 })
   }
 }

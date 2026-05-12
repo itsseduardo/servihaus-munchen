@@ -50,6 +50,11 @@ export async function GET() {
       employmentType: user.employee.employmentType,
       isActive: user.employee.isActive,
       active: user.employee.active,
+      inactiveReason: user.employee.inactiveReason,
+      inactiveDetails: user.employee.inactiveDetails,
+      inactiveSince: user.employee.inactiveSince,
+      inactiveUntil: user.employee.inactiveUntil,
+      reactivatedAt: user.employee.reactivatedAt,
     })
   } catch (error) {
     console.error("EMPLOYEE ME ERROR:", error)

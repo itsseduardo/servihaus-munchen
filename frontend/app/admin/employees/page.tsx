@@ -2,20 +2,92 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+
 import CreateEmployeeModal from "@/components/admin/CreateEmployeeModal"
+
+type EmploymentType = "MINIJOB_603" | "MIDIJOB" | "FULL_TIME" | string
 
 interface Employee {
   id: number
   firstName: string
   lastName: string
-  profession: string
-  email: string
-  phone: string | null
-  hourlyRate: number | null
-  employmentType: "MINIJOB_603" | "MIDIJOB" | "FULL_TIME"
-  contractedHoursPerWeek: number | null
-  vacationDaysPerYear: number | null
-  isActive: boolean // <-- Nuevo campo
+  fullName?: string
+  profession?: string | null
+  email?: string | null
+  phone?: string | null
+  hourlyRate?: number | null
+  employmentType?: EmploymentType | null
+  contractedHoursPerWeek?: number | null
+  vacationDaysPerYear?: number | null
+  active?: boolean
+  isActive?: boolean
+  inactiveReason?: string | null
+  inactiveDetails?: string | null
+  inactiveSince?: string | null
+  inactiveUntil?: string | null
+  reactivatedAt?: string | null
+  userId?: string | null
+  hasLogin?: boolean
+  servicesCount?: number
+  createdAt?: string
+}
+
+const ITEMS_PER_PAGE = 8
+
+function isEmployeeActive(employee: Employee) {
+  return employee.isActive !== false && employee.active !== false
+}
+
+function getEmploymentLabel(type?: EmploymentType | null) {
+  switch (type) {
+    case "MINIJOB_603":
+      return "Minijob"
+    case "MIDIJOB":
+      return "Midijob"
+    case "FULL_TIME":
+      return "Vollzeit"
+    default:
+      return type || "Nicht hinterlegt"
+  }
+}
+
+function getInactiveReasonLabel(reason?: string | null) {
+  switch (reason) {
+    case "SICK_LEAVE":
+      return "Krankmeldung"
+    case "MEDICAL_LEAVE":
+      return "Medizinische Abwesenheit"
+    case "TERMINATED":
+      return "Kündigung / Entlassung"
+    case "SUSPENDED":
+      return "Suspendiert"
+    case "VACATION":
+      return "Urlaub / Freistellung"
+    case "OTHER":
+      return "Sonstiges"
+    default:
+      return "Nicht angegeben"
+  }
+}
+
+function formatDate(dateValue?: string | null) {
+  if (!dateValue) return "-"
+
+  const date = new Date(dateValue)
+
+  if (Number.isNaN(date.getTime())) return "-"
+
+  return date.toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  })
+}
+
+function formatHourlyRate(rate?: number | null) {
+  if (rate === null || rate === undefined) return "-"
+
+  return `${Number(rate).toFixed(2)} €/h`
 }
 
 export default function AdminEmployeesPage() {
@@ -24,21 +96,25 @@ export default function AdminEmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(true)
-
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 8
 
-  // 🔥 ESTADOS PARA LOS FILTROS
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState("ALL")
-  const [statusFilter, setStatusFilter] = useState("ACTIVE") // <-- Filtro Activo/Inactivo
+  const [statusFilter, setStatusFilter] = useState("ACTIVE")
 
   const fetchEmployees = async () => {
     try {
-      const res = await fetch("/api/employees")
-      const data = await res.json()
+      setLoading(true)
+
+      const res = await fetch("/api/employees", {
+        cache: "no-store",
+      })
+
+      const data = await res.json().catch(() => [])
+
       setEmployees(Array.isArray(data) ? data : [])
-    } catch {
+    } catch (error) {
+      console.error("EMPLOYEES LOAD ERROR:", error)
       setEmployees([])
     } finally {
       setLoading(false)
@@ -50,42 +126,55 @@ export default function AdminEmployeesPage() {
   }, [])
 
   const handleCreated = async () => {
+    setIsOpen(false)
     await fetchEmployees()
     router.refresh()
   }
 
   const stats = useMemo(() => {
-    // Solo contamos las estadísticas de los activos
-    const activeEmps = employees.filter(e => e.isActive !== false)
+    const activeEmployees = employees.filter(isEmployeeActive)
+    const inactiveEmployees = employees.filter(
+      (employee) => !isEmployeeActive(employee)
+    )
+
     return {
-      total: activeEmps.length,
-      minijob: activeEmps.filter(e => e.employmentType === "MINIJOB_603").length,
-      midijob: activeEmps.filter(e => e.employmentType === "MIDIJOB").length,
-      fulltime: activeEmps.filter(e => e.employmentType === "FULL_TIME").length,
+      total: activeEmployees.length,
+      inactive: inactiveEmployees.length,
+      minijob: activeEmployees.filter(
+        (employee) => employee.employmentType === "MINIJOB_603"
+      ).length,
+      midijob: activeEmployees.filter(
+        (employee) => employee.employmentType === "MIDIJOB"
+      ).length,
+      fulltime: activeEmployees.filter(
+        (employee) => employee.employmentType === "FULL_TIME"
+      ).length,
     }
   }, [employees])
 
-  // 🔥 LÓGICA DE FILTRADO MEJORADA
   const filteredEmployees = useMemo(() => {
-    return employees.filter((emp) => {
-      const searchLower = searchTerm.toLowerCase()
-      
-      const matchesSearch = 
-        emp.firstName.toLowerCase().includes(searchLower) ||
-        emp.lastName.toLowerCase().includes(searchLower) ||
-        `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchLower) ||
-        emp.email.toLowerCase().includes(searchLower) ||
-        emp.profession?.toLowerCase().includes(searchLower) ||
-        emp.id.toString().includes(searchLower)
+    return employees.filter((employee) => {
+      const searchLower = searchTerm.trim().toLowerCase()
 
-      const matchesRole = roleFilter === "ALL" || emp.employmentType === roleFilter
-      
-      // Lógica de Activo/Inactivo (asumimos true si es undefined por registros viejos)
-      const isEmpActive = emp.isActive !== false 
-      const matchesStatus = 
+      const matchesSearch =
+        !searchLower ||
+        employee.firstName?.toLowerCase().includes(searchLower) ||
+        employee.lastName?.toLowerCase().includes(searchLower) ||
+        employee.fullName?.toLowerCase().includes(searchLower) ||
+        employee.email?.toLowerCase().includes(searchLower) ||
+        employee.phone?.toLowerCase().includes(searchLower) ||
+        employee.profession?.toLowerCase().includes(searchLower) ||
+        employee.id.toString().includes(searchLower)
+
+      const matchesRole =
+        roleFilter === "ALL" || employee.employmentType === roleFilter
+
+      const employeeActive = isEmployeeActive(employee)
+
+      const matchesStatus =
         statusFilter === "ALL" ||
-        (statusFilter === "ACTIVE" && isEmpActive) ||
-        (statusFilter === "INACTIVE" && !isEmpActive)
+        (statusFilter === "ACTIVE" && employeeActive) ||
+        (statusFilter === "INACTIVE" && !employeeActive)
 
       return matchesSearch && matchesRole && matchesStatus
     })
@@ -95,161 +184,413 @@ export default function AdminEmployeesPage() {
     setCurrentPage(1)
   }, [searchTerm, roleFilter, statusFilter])
 
-  const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage)
-  const paginatedEmployees = filteredEmployees.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE)
   )
 
-  if (loading) return <div className="p-10 text-center text-slate-500 font-bold">Laden...</div>
+  const paginatedEmployees = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    const end = start + ITEMS_PER_PAGE
+
+    return filteredEmployees.slice(start, end)
+  }, [filteredEmployees, currentPage])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-slate-50 p-6">
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <div className="rounded-3xl border border-slate-100 bg-white p-8 shadow-sm">
+            <div className="flex flex-col items-center gap-4">
+              <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
+
+              <p className="text-sm font-black uppercase tracking-[0.18em] text-slate-400">
+                Mitarbeiter werden geladen
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
+    )
+  }
 
   return (
-    <div className="p-10 space-y-10 bg-slate-50/30 min-h-screen">
+    <main className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
+      <section className="mx-auto max-w-7xl space-y-6">
+        {/* HEADER */}
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">
+              Admin / Mitarbeiter
+            </p>
 
-      <div className="flex justify-between items-end">
-        <div>
-          <h1 className="text-4xl font-black tracking-tight text-slate-900">Mitarbeiterverwaltung</h1>
-          <p className="text-slate-500 mt-2 font-medium">Zentrales Register für Arbeitsverträge & Stundenkonten</p>
-        </div>
-        <button onClick={() => setIsOpen(true)} className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all">
-          + Neuer Mitarbeiter
-        </button>
-      </div>
+            <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+              Mitarbeiterverwaltung
+            </h1>
 
-      {/* KPI CARDS (Ocultas en este snippet por brevedad, mantén las tuyas) */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p className="text-[10px] font-black uppercase text-slate-400 text-center">Aktive Gesamt</p>
-          <p className="text-4xl font-black mt-2 text-center text-slate-800">{stats.total}</p>
-        </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p className="text-[10px] font-black uppercase text-blue-500 text-center">Minijob (603€)</p>
-          <p className="text-4xl font-black mt-2 text-center text-blue-600">{stats.minijob}</p>
-        </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p className="text-[10px] font-black uppercase text-amber-500 text-center">Midijob</p>
-          <p className="text-4xl font-black mt-2 text-center text-amber-600">{stats.midijob}</p>
-        </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p className="text-[10px] font-black uppercase text-emerald-500 text-center">Vollzeit</p>
-          <p className="text-4xl font-black mt-2 text-center text-emerald-600">{stats.fulltime}</p>
-        </div>
-      </div>
+            <p className="mt-2 text-sm font-medium text-slate-500">
+              Zentrales Register für Mitarbeiter, Verträge, Status und
+              Arbeitskonten.
+            </p>
+          </div>
 
-      {/* 🔥 BARRA DE BÚSQUEDA Y NUEVOS FILTROS */}
-      <div className="flex flex-col md:flex-row gap-4 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="relative flex-1">
-          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-          <input
-            type="text"
-            placeholder="Suchen nach Vorname, Nachname..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 rounded-xl bg-slate-50/50 border-none outline-none font-medium text-slate-700"
-          />
+          <button
+            type="button"
+            onClick={() => setIsOpen(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-blue-100 transition-all hover:bg-blue-700"
+          >
+            <span className="material-symbols-outlined text-[20px]">
+              person_add
+            </span>
+            Neuer Mitarbeiter
+          </button>
         </div>
-        <div className="w-px bg-slate-100 hidden md:block"></div>
-        
-        {/* Filtro Rol */}
-        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="px-4 py-3 bg-transparent font-bold text-slate-600 outline-none cursor-pointer">
-          <option value="ALL">Alle Verträge</option>
-          <option value="MINIJOB_603">Minijob</option>
-          <option value="MIDIJOB">Midijob</option>
-          <option value="FULL_TIME">Vollzeit</option>
-        </select>
 
-        <div className="w-px bg-slate-100 hidden md:block"></div>
+        {/* KPI CARDS */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="rounded-[1.75rem] border border-slate-100 bg-white p-5 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+              Aktiv
+            </p>
+            <p className="mt-3 text-3xl font-black text-slate-950">
+              {stats.total}
+            </p>
+          </div>
 
-        {/* 🔥 Filtro Estado (Activo/Inactivo) */}
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-4 py-3 bg-transparent font-bold text-slate-600 outline-none cursor-pointer">
-          <option value="ACTIVE">🟢 Aktiv (Activos)</option>
-          <option value="INACTIVE">🔴 Inaktiv (Inactivos)</option>
-          <option value="ALL">⚪ Alle (Todos)</option>
-        </select>
-      </div>
+          <div className="rounded-[1.75rem] border border-rose-100 bg-white p-5 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-rose-400">
+              Inaktiv
+            </p>
+            <p className="mt-3 text-3xl font-black text-rose-600">
+              {stats.inactive}
+            </p>
+          </div>
 
-      {/* TABLE */}
-      {paginatedEmployees.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-200 p-16 text-center">
-          <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">person_search</span>
-          <h3 className="text-lg font-black text-slate-700">Keine Mitarbeiter gefunden</h3>
+          <div className="rounded-[1.75rem] border border-slate-100 bg-white p-5 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+              Minijob
+            </p>
+            <p className="mt-3 text-3xl font-black text-blue-600">
+              {stats.minijob}
+            </p>
+          </div>
+
+          <div className="rounded-[1.75rem] border border-slate-100 bg-white p-5 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+              Midijob
+            </p>
+            <p className="mt-3 text-3xl font-black text-emerald-600">
+              {stats.midijob}
+            </p>
+          </div>
+
+          <div className="rounded-[1.75rem] border border-slate-100 bg-white p-5 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+              Vollzeit
+            </p>
+            <p className="mt-3 text-3xl font-black text-amber-600">
+              {stats.fulltime}
+            </p>
+          </div>
         </div>
-      ) : (
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b">
-                <th className="px-8 py-5 text-left">Status</th>
-                <th className="px-8 py-5 text-left">Vorname</th>
-                <th className="px-8 py-5 text-left">Nachname</th>
-                <th className="px-8 py-5 text-left">Vertragstyp</th>
-                <th className="px-8 py-5 text-left text-blue-600">Wochenstunden</th>
-                <th className="px-8 py-5 text-right">Lohn</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {paginatedEmployees.map((employee) => (
-                <tr key={employee.id} onClick={() => router.push(`/admin/employees/${employee.id}`)} className={`hover:bg-slate-50/50 cursor-pointer transition-colors ${employee.isActive === false ? 'opacity-50 bg-slate-50/50' : ''}`}>
-                  
-                  {/* Celda de Status Visual */}
-                  <td className="px-8 py-5">
-                    {employee.isActive !== false ? (
-                      <span className="w-3 h-3 rounded-full bg-emerald-500 block shadow-[0_0_8px_rgba(16,185,129,0.5)]" title="Aktiv"></span>
-                    ) : (
-                      <span className="w-3 h-3 rounded-full bg-rose-500 block" title="Inaktiv"></span>
-                    )}
-                  </td>
 
-                  <td className="px-8 py-5 font-bold text-slate-800">{employee.firstName}</td>
-                  <td className="px-8 py-5 font-bold text-slate-800">{employee.lastName}</td>
-                  
-                  <td className="px-8 py-5">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${employee.employmentType === "MINIJOB_603" ? "bg-blue-100 text-blue-700" : employee.employmentType === "MIDIJOB" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
-                      {employee.employmentType.replace("_603", "")}
-                    </span>
-                  </td>
-                  <td className="px-8 py-5 font-black text-blue-600">{employee.contractedHoursPerWeek ? `${employee.contractedHoursPerWeek}h` : "-"}</td>
-                  <td className="px-8 py-5 text-right font-bold text-slate-700">{employee.hourlyRate ? `${employee.hourlyRate.toFixed(2)} €/h` : "-"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* FILTERS */}
+        <div className="rounded-[2rem] border border-slate-100 bg-white p-4 shadow-sm">
+          <div className="grid gap-3 lg:grid-cols-[1fr_220px_220px]">
+            <div className="relative">
+              <span className="material-symbols-outlined pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                search
+              </span>
+
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Nach Vorname, Nachname, E-Mail, Telefon, Beruf oder ID suchen..."
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 text-sm font-medium text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-blue-300 focus:bg-white"
+              />
+            </div>
+
+            <select
+              value={roleFilter}
+              onChange={(event) => setRoleFilter(event.target.value)}
+              className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 outline-none transition-all focus:border-blue-300"
+            >
+              <option value="ALL">Alle Verträge</option>
+              <option value="MINIJOB_603">Minijob</option>
+              <option value="MIDIJOB">Midijob</option>
+              <option value="FULL_TIME">Vollzeit</option>
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 outline-none transition-all focus:border-blue-300"
+            >
+              <option value="ACTIVE">Nur aktive</option>
+              <option value="INACTIVE">Nur inaktive</option>
+              <option value="ALL">Alle Status</option>
+            </select>
+          </div>
         </div>
-      )}
+
+        {/* CONTENT */}
+        {filteredEmployees.length === 0 ? (
+          <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
+            <span className="material-symbols-outlined text-5xl text-slate-300">
+              person_search
+            </span>
+
+            <h2 className="mt-4 text-2xl font-black text-slate-950">
+              Keine Mitarbeiter gefunden
+            </h2>
+
+            <p className="mt-2 text-sm font-medium text-slate-500">
+              Ändere die Filter oder lege einen neuen Mitarbeiter an.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="border-b border-slate-100 bg-slate-50">
+                  <tr className="text-left">
+                    <th className="px-6 py-4 text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                      Status
+                    </th>
+
+                    <th className="px-6 py-4 text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                      Vorname
+                    </th>
+
+                    <th className="px-6 py-4 text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                      Nachname
+                    </th>
+
+                    <th className="px-6 py-4 text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                      Kontakt
+                    </th>
+
+                    <th className="px-6 py-4 text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                      Position
+                    </th>
+
+                    <th className="px-6 py-4 text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                      Vertrag
+                    </th>
+
+                    <th className="px-6 py-4 text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                      Wochenstunden
+                    </th>
+
+                    <th className="px-6 py-4 text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                      Lohn
+                    </th>
+
+                    <th className="px-6 py-4 text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                      Inaktivität
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {paginatedEmployees.map((employee) => {
+                    const employeeActive = isEmployeeActive(employee)
+
+                    return (
+                      <tr
+                        key={employee.id}
+                        onClick={() =>
+                          router.push(`/admin/employees/${employee.id}`)
+                        }
+                        className={`cursor-pointer border-b border-slate-100 transition-colors last:border-b-0 hover:bg-slate-50 ${
+                          !employeeActive ? "bg-slate-50/60 opacity-75" : ""
+                        }`}
+                      >
+                        <td className="px-6 py-5 align-top">
+                          {employeeActive ? (
+                            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
+                              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                              Aktiv
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-2 rounded-full border border-rose-100 bg-rose-50 px-3 py-1 text-xs font-black text-rose-700">
+                              <span className="h-2 w-2 rounded-full bg-rose-500" />
+                              Inaktiv
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-6 py-5 align-top">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-sm font-black ${
+                                employeeActive
+                                  ? "bg-blue-50 text-blue-600"
+                                  : "bg-slate-200 text-slate-500"
+                              }`}
+                            >
+                              {employee.firstName?.[0] || "?"}
+                            </div>
+
+                            <div>
+                              <p className="font-black text-slate-900">
+                                {employee.firstName || "-"}
+                              </p>
+
+                              <p className="mt-1 text-xs font-bold text-slate-400">
+                                ID {employee.id}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-5 align-top">
+                          <p className="font-black text-slate-900">
+                            {employee.lastName || "-"}
+                          </p>
+                        </td>
+
+                        <td className="px-6 py-5 align-top">
+                          <p className="max-w-[220px] truncate text-sm font-bold text-slate-700">
+                            {employee.email || "Keine E-Mail"}
+                          </p>
+
+                          <p className="mt-1 text-xs font-medium text-slate-400">
+                            {employee.phone || "Keine Telefonnummer"}
+                          </p>
+                        </td>
+
+                        <td className="px-6 py-5 align-top">
+                          <p className="text-sm font-bold text-slate-700">
+                            {employee.profession || "Mitarbeiter"}
+                          </p>
+
+                          <p className="mt-1 text-xs font-medium text-slate-400">
+                            {employee.hasLogin ? "Login aktiv" : "Ohne Login"}
+                          </p>
+                        </td>
+
+                        <td className="px-6 py-5 align-top">
+                          <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
+                            {getEmploymentLabel(employee.employmentType)}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-5 align-top text-sm font-bold text-slate-700">
+                          {employee.contractedHoursPerWeek
+                            ? `${employee.contractedHoursPerWeek} h`
+                            : "-"}
+                        </td>
+
+                        <td className="px-6 py-5 align-top text-sm font-bold text-slate-700">
+                          {formatHourlyRate(employee.hourlyRate)}
+                        </td>
+
+                        <td className="px-6 py-5 align-top">
+                          {employeeActive ? (
+                            <span className="text-xs font-bold text-slate-400">
+                              -
+                            </span>
+                          ) : (
+                            <div className="max-w-[240px]">
+                              <p className="text-sm font-black text-rose-700">
+                                {getInactiveReasonLabel(employee.inactiveReason)}
+                              </p>
+
+                              <p className="mt-1 text-xs font-medium text-slate-400">
+                                Seit {formatDate(employee.inactiveSince)}
+                                {employee.inactiveUntil
+                                  ? ` · Bis ${formatDate(
+                                      employee.inactiveUntil
+                                    )}`
+                                  : ""}
+                              </p>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
 
             {/* PAGINATION */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2">
-          <button
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => p - 1)}
-            className="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"
-          >
-            ←
-          </button>
-          {Array.from({ length: totalPages }).map((_, i) => (
-            <button
-              key={i + 1}
-              onClick={() => setCurrentPage(i + 1)}
-              className={`w-10 h-10 rounded-xl font-bold text-sm transition-all ${currentPage === i + 1
-                  ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20"
-                  : "bg-white border border-slate-200 text-slate-500 hover:bg-slate-50"
-                }`}
-            >
-              {i + 1}
-            </button>
-          ))}
-          <button
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage((p) => p + 1)}
-            className="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"
-          >
-            →
-          </button>
-        </div>
+            {filteredEmployees.length > ITEMS_PER_PAGE && (
+              <div className="flex flex-col gap-4 border-t border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm font-medium text-slate-500">
+                  Zeige {(currentPage - 1) * ITEMS_PER_PAGE + 1}-
+                  {Math.min(
+                    currentPage * ITEMS_PER_PAGE,
+                    filteredEmployees.length
+                  )}{" "}
+                  von {filteredEmployees.length}
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(1, prev - 1))
+                    }
+                    className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    ←
+                  </button>
+
+                  {Array.from({ length: totalPages }).map((_, index) => {
+                    const page = index + 1
+                    const active = page === currentPage
+
+                    return (
+                      <button
+                        key={page}
+                        type="button"
+                        onClick={() => setCurrentPage(page)}
+                        className={`h-10 min-w-10 rounded-xl px-3 text-sm font-black transition-all ${
+                          active
+                            ? "bg-blue-600 text-white shadow-lg shadow-blue-100"
+                            : "border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  })}
+
+                  <button
+                    type="button"
+                    disabled={currentPage === totalPages}
+                    onClick={() =>
+                      setCurrentPage((prev) =>
+                        Math.min(totalPages, prev + 1)
+                      )
+                    }
+                    className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    →
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {isOpen && (
+        <CreateEmployeeModal
+          onClose={() => setIsOpen(false)}
+          onCreated={handleCreated}
+        />
       )}
-      
-      {isOpen && <CreateEmployeeModal onClose={() => setIsOpen(false)} onCreated={handleCreated} />}
-    </div>
+    </main>
   )
 }

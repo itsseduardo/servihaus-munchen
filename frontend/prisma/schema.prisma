@@ -44,6 +44,12 @@ model Employee {
   payrollRecords PayrollRecord[]
   workAuditLogs          EmployeeAuditLog[] @relation("EmployeeWorkAudits")
 
+  inactiveReason  String?
+  inactiveDetails String?  @db.Text
+  inactiveSince   DateTime?
+  inactiveUntil   DateTime?
+  reactivatedAt   DateTime?
+
   user        User? @relation(fields: [userId], references: [id])
   assignments ServiceAssignment[]
   debtHours Float @default(0) // Horas que el empleado debe recuperar
