@@ -241,16 +241,16 @@ export default function EmployeeDashboardPage() {
       <>
         <InactiveEmployeeScreen employee={employee} />
         <BottomNav
-          activeTab="today"
-          onTabChange={() => {}}
-          onOpenMaterial={() => {}}
+          active="today"
+          onTabChange={() => { }}
+          onOpenMaterial={() => { }}
         />
       </>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-6 pb-24">
+    <div className="min-h-screen bg-slate-50 px-4 py-6 pb-[calc(120px+env(safe-area-inset-bottom))]">
       {bottomTab === "home" ? (
         <>
           <header className="relative overflow-hidden rounded-[2rem] bg-blue-600 p-6 text-white shadow-xl shadow-blue-100">
@@ -291,11 +291,10 @@ export default function EmployeeDashboardPage() {
               <button
                 type="button"
                 onClick={() => setDateFilter("today")}
-                className={`rounded-xl py-2.5 text-[11px] font-black uppercase tracking-wider transition-all ${
-                  dateFilter === "today"
-                    ? "bg-white text-blue-600 shadow-sm"
-                    : "text-slate-500"
-                }`}
+                className={`rounded-xl py-2.5 text-[11px] font-black uppercase tracking-wider transition-all ${dateFilter === "today"
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-slate-500"
+                  }`}
               >
                 Heute
               </button>
@@ -303,11 +302,10 @@ export default function EmployeeDashboardPage() {
               <button
                 type="button"
                 onClick={() => setDateFilter("tomorrow")}
-                className={`rounded-xl py-2.5 text-[11px] font-black uppercase tracking-wider transition-all ${
-                  dateFilter === "tomorrow"
-                    ? "bg-white text-blue-600 shadow-sm"
-                    : "text-slate-500"
-                }`}
+                className={`rounded-xl py-2.5 text-[11px] font-black uppercase tracking-wider transition-all ${dateFilter === "tomorrow"
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-slate-500"
+                  }`}
               >
                 Morgen
               </button>
@@ -315,11 +313,10 @@ export default function EmployeeDashboardPage() {
               <button
                 type="button"
                 onClick={() => setDateFilter("history")}
-                className={`rounded-xl py-2.5 text-[11px] font-black uppercase tracking-wider transition-all ${
-                  dateFilter === "history"
-                    ? "bg-white text-blue-600 shadow-sm"
-                    : "text-slate-500"
-                }`}
+                className={`rounded-xl py-2.5 text-[11px] font-black uppercase tracking-wider transition-all ${dateFilter === "history"
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-slate-500"
+                  }`}
               >
                 Historie
               </button>
@@ -367,7 +364,7 @@ export default function EmployeeDashboardPage() {
               </div>
             )}
 
-            {!isShiftActive && dateFilter === "today" && (
+            {!isShiftActive && dateFilter === "today" && tasks.length > 0 && (
               <div className="mt-5 rounded-2xl border border-amber-100 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-700">
                 <div className="flex items-center gap-3">
                   <span className="material-symbols-outlined">lock_clock</span>
@@ -382,7 +379,7 @@ export default function EmployeeDashboardPage() {
       )}
 
       <BottomNav
-        activeTab={currentBottomActive}
+        active={currentBottomActive}
         onTabChange={(tab: string) => {
           if (tab === "profile") {
             setBottomTab("profile")

@@ -1,43 +1,68 @@
 "use client"
 
-interface Props {
-  activeTab: "today" | "history" | "profile"
-  onTabChange: (tab: "today" | "history" | "profile") => void
+type Props = {
+  active: string
+  onTabChange: (tab: string) => void
   onOpenMaterial: () => void
 }
 
-export default function BottomNav({ activeTab, onTabChange, onOpenMaterial }: Props) {
-  return (
-    <nav className="absolute bottom-0 w-full bg-white border-t border-gray-200 px-6 py-3 pb-8 z-30">
-      <div className="flex items-center justify-between">
-        
-        {/* Botón 1: My Jobs */}
-        <button 
-          onClick={() => onTabChange("today")}
-          className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'today' ? 'text-[#1173d4]' : 'text-gray-400 hover:text-[#1173d4]'}`}
-        >
-          <span className="material-symbols-outlined font-bold">calendar_month</span>
-          <span className="text-[10px] font-extrabold uppercase tracking-tighter">My Jobs</span>
-        </button>
-        
-        {/* Botón 2: Material (Abre Modal) */}
-        <button 
-          onClick={onOpenMaterial}
-          className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#1173d4] transition-colors"
-        >
-          <span className="material-symbols-outlined">inventory_2</span>
-          <span className="text-[10px] font-extrabold uppercase tracking-tighter">Material</span>
-        </button>
-        
-        {/* Botón 3: Profile */}
-        <button 
-          onClick={() => onTabChange("profile")}
-          className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'profile' ? 'text-[#1173d4]' : 'text-gray-400 hover:text-[#1173d4]'}`}
-        >
-          <span className="material-symbols-outlined">account_circle</span>
-          <span className="text-[10px] font-extrabold uppercase tracking-tighter">Profile</span>
-        </button>
+export default function BottomNav({
+  active,
+  onTabChange,
+  onOpenMaterial,
+}: Props) {
+  const navItems = [
+    {
+      key: "today",
+      label: "MY JOBS",
+      icon: "calendar_month",
+      onClick: () => onTabChange("today"),
+    },
+    {
+      key: "material",
+      label: "MATERIAL",
+      icon: "inventory_2",
+      onClick: onOpenMaterial,
+    },
+    {
+      key: "profile",
+      label: "PROFILE",
+      icon: "account_circle",
+      onClick: () => onTabChange("profile"),
+    },
+  ]
 
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-4 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+      <div className="mx-auto grid h-16 max-w-xl grid-cols-3 items-center">
+        {navItems.map((item) => {
+          const isActive = active === item.key
+
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={item.onClick}
+              className={`flex h-full flex-col items-center justify-center gap-1 rounded-2xl transition-all ${
+                isActive
+                  ? "text-blue-600"
+                  : "text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              <span
+                className={`material-symbols-outlined text-[26px] ${
+                  isActive ? "fill-1" : ""
+                }`}
+              >
+                {item.icon}
+              </span>
+
+              <span className="text-[10px] font-black tracking-wide">
+                {item.label}
+              </span>
+            </button>
+          )
+        })}
       </div>
     </nav>
   )
