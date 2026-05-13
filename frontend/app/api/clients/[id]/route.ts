@@ -5,7 +5,7 @@ import { NextResponse } from "next/server"
 // GET CLIENT DETAIL
 //
 export async function GET(
-  req: Request,
+  _req: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -24,6 +24,11 @@ export async function GET(
         id: clientId,
       },
       include: {
+        contracts: {
+          orderBy: {
+            createdAt: "desc",
+          },
+        },
         services: {
           include: {
             serviceCode: true,
@@ -110,7 +115,7 @@ export async function PUT(
 // DELETE CLIENT
 //
 export async function DELETE(
-  req: Request,
+  _req: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   try {

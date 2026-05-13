@@ -77,6 +77,7 @@ model Client {
   services Service[]
   inventories   ClientInventory[]
   deliveryLogs  DeliveryLog[]
+  contracts ClientContract[]
   user       User?
 }
 
@@ -302,6 +303,25 @@ model EmployeeAuditLog {
   employee    Employee          @relation("EmployeeWorkAudits", fields: [employeeId], references: [id], onDelete: Cascade)
 
   createdAt   DateTime          @default(now())
+}
+
+model ClientContract {
+  id            Int       @id @default(autoincrement())
+  clientId      Int
+  title         String    @default("Kundenvertrag")
+  contractType  String?
+  startDate     DateTime?
+  endDate       DateTime?
+  frequency     String?
+  agreedHours   Float?
+  agreedPrice   Float?
+  pricingModel  String?   @default("TIME")
+  notes         String?   @db.Text
+  status        String    @default("ACTIVE")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
 enum TimeBlockType {

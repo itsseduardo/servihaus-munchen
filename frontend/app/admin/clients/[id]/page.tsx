@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 
 import ClientModal from "@/components/admin/ClientModal"
 import CreateServiceModal from "@/components/admin/CreateServiceModal"
+import ClientContractModal from "@/components/admin/ClientContractModal"
 
 type ClientDetail = {
   id: number
@@ -192,6 +193,9 @@ export default function ClientDetailPage() {
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false)
   const [servicePage, setServicePage] = useState(1)
   const [sendingPortalAccess, setSendingPortalAccess] = useState(false)
+
+  const [isContractModalOpen, setIsContractModalOpen] = useState(false)
+  const [selectedContract, setSelectedContract] = useState<any | null>(null)
 
   const fetchClient = async () => {
     try {
@@ -772,11 +776,10 @@ export default function ClientDetailPage() {
 
                 <button
                   type="button"
-                  onClick={() =>
-                    alert(
-                      "Die Vertragsverwaltung wird im nächsten Schritt aktiviert."
-                    )
-                  }
+                  onClick={() => {
+                    setSelectedContract(null)
+                    setIsContractModalOpen(true)
+                  }}
                   className="rounded-xl border-2 border-blue-600 bg-blue-600 px-6 py-2 text-xs font-black uppercase text-white shadow-sm transition-all hover:bg-blue-700"
                 >
                   Vertrag anlegen
@@ -838,6 +841,18 @@ export default function ClientDetailPage() {
                           : "-"}
                     </p>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedContract(latestContract)
+                      setIsContractModalOpen(true)
+                    }}
+                    className="mt-6 rounded-xl border-2 border-slate-200 bg-white px-6 py-2 text-xs font-black uppercase text-slate-700 shadow-sm transition-all hover:border-blue-600 hover:text-blue-600"
+                  >
+                    Vertrag bearbeiten
+                  </button>
+
                 </div>
               ) : (
                 <div className="mt-6 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
@@ -1076,6 +1091,22 @@ export default function ClientDetailPage() {
           onClose={() => setIsServiceModalOpen(false)}
           onCreated={() => {
             setIsServiceModalOpen(false)
+            fetchClient()
+          }}
+        />
+      )}
+
+      {isContractModalOpen && (
+        <ClientContractModal
+          clientId={client.id}
+          contract={selectedContract}
+          onClose={() => {
+            setIsContractModalOpen(false)
+            setSelectedContract(null)
+          }}
+          onSaved={() => {
+            setIsContractModalOpen(false)
+            setSelectedContract(null)
             fetchClient()
           }}
         />
