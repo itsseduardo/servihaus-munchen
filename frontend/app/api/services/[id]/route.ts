@@ -281,6 +281,19 @@ export async function PUT(
             body.teamDuration === null || body.teamDuration === ""
               ? null
               : Number(body.teamDuration)
+        } else if (hasEmployeeUpdate) {
+          const employeeCount = employeeIds.length
+
+          const totalServiceHours =
+            Number(item.duration || 0) ||
+            Number(item.billedHours || 0) ||
+            Number(service.duration || 0) ||
+            Number(service.billedHours || 0)
+
+          updateData.teamDuration =
+            employeeCount > 0 && totalServiceHours > 0
+              ? totalServiceHours / employeeCount
+              : totalServiceHours || null
         }
 
         if (body.date !== undefined) {

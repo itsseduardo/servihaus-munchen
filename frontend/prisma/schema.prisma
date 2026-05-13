@@ -18,6 +18,8 @@ model User {
   
   employee  Employee? // Relación actual
   
+  mustChangePassword Boolean @default(false)
+
   // NUEVA RELACIÓN PARA CLIENTES
   client    Client?   @relation(fields: [clientId], references: [id])
   clientId  Int?      @unique 
@@ -68,6 +70,9 @@ model Client {
 
   clientType    ClientType     @default(PRIVAT) // PRIVAT o FIRMA
   hasCompletedOnboarding Boolean        @default(false) // Control de onboarding
+  
+  portalInvitationSentAt DateTime?
+  portalInvitationSentBy String?
 
   services Service[]
   inventories   ClientInventory[]

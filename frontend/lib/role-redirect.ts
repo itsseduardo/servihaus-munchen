@@ -1,5 +1,11 @@
+export function getRoleRedirectPath(
+  role?: string | null,
+  mustChangePassword?: boolean
+) {
+  if (mustChangePassword) {
+    return "/change-password"
+  }
 
-export function getDashboardPathByRole(role?: string | null) {
   switch (role) {
     case "ADMIN":
       return "/admin/dashboard"
@@ -11,3 +17,6 @@ export function getDashboardPathByRole(role?: string | null) {
       return "/login"
   }
 }
+
+// Alias para compatibilidad con imports antiguos
+export const getDashboardPathByRole = getRoleRedirectPath

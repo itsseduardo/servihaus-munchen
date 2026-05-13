@@ -1,4 +1,3 @@
-
 import type { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
@@ -23,8 +22,12 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
+        const normalizedEmail = credentials.email.trim().toLowerCase()
+
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: {
+            email: normalizedEmail,
+          },
         })
 
         if (!user) return null
@@ -41,7 +44,8 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           email: user.email,
           role: user.role,
-        }
+          mustChangePassword: user.mustChangePassword,
+        } as any
       },
     }),
   ],
@@ -49,8 +53,11 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id
-        token.role = user.role
+        token.id = (user as any).id
+        token.role = (user as any).role
+        token.mustChangePassword = Boolean(
+          (user as any).mustChangePassword
+        )
       }
 
       return token
@@ -60,6 +67,9 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string
         session.user.role = token.role as string
+        session.user.mustChangePassword = Boolean(
+          token.mustChangePassword
+        )
       }
 
       return session

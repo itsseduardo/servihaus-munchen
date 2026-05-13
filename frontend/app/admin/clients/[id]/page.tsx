@@ -166,9 +166,8 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`relative px-1 pb-5 text-sm font-black transition-colors sm:text-base ${
-        active ? "text-blue-600" : "text-slate-400 hover:text-slate-700"
-      }`}
+      className={`relative px-1 pb-5 text-sm font-black transition-colors sm:text-base ${active ? "text-blue-600" : "text-slate-400 hover:text-slate-700"
+        }`}
     >
       {children}
 
@@ -192,6 +191,7 @@ export default function ClientDetailPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false)
   const [servicePage, setServicePage] = useState(1)
+  const [sendingPortalAccess, setSendingPortalAccess] = useState(false)
 
   const fetchClient = async () => {
     try {
@@ -346,6 +346,42 @@ export default function ClientDetailPage() {
     })[0]
   }, [client])
 
+  async function handleSendPortalAccess() {
+    if (!client) return
+
+    const confirmed = confirm(
+      `Portalzugang für ${client.name} erstellen und E-Mail vorbereiten?`
+    )
+
+    if (!confirmed) return
+
+    try {
+      setSendingPortalAccess(true)
+
+      const res = await fetch(`/api/admin/clients/${client.id}/portal-access`, {
+        method: "POST",
+      })
+
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) {
+        alert(data?.error || "Portalzugang konnte nicht erstellt werden.")
+        return
+      }
+
+      if (data?.email?.mailto) {
+        window.location.href = data.email.mailto
+      }
+
+      await fetchClient()
+    } catch (error) {
+      console.error("PORTAL ACCESS ERROR:", error)
+      alert("Portalzugang konnte nicht erstellt werden.")
+    } finally {
+      setSendingPortalAccess(false)
+    }
+  }
+
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-50 p-6">
@@ -419,6 +455,15 @@ export default function ClientDetailPage() {
 
             <button
               type="button"
+              onClick={handleSendPortalAccess}
+              disabled={sendingPortalAccess || !client.email}
+              className="rounded-xl border-2 border-emerald-600 bg-emerald-600 px-6 py-2 text-xs font-black uppercase text-white shadow-sm transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {sendingPortalAccess ? "Wird vorbereitet..." : "Portalzugang senden"}
+            </button>
+
+            <button
+              type="button"
               onClick={() => setIsEditModalOpen(true)}
               className="rounded-xl border-2 border-slate-200 bg-white px-6 py-2 text-xs font-black uppercase text-slate-700 shadow-sm transition-all hover:border-blue-600 hover:text-blue-600"
             >
@@ -447,10 +492,9 @@ export default function ClientDetailPage() {
 
                   <div className="mt-3 flex flex-wrap gap-2">
                     <span
-                      className={`rounded-full border px-3 py-1 text-xs font-black ${
-                        categoryStyles[client.category || "C"] ||
+                      className={`rounded-full border px-3 py-1 text-xs font-black ${categoryStyles[client.category || "C"] ||
                         categoryStyles.C
-                      }`}
+                        }`}
                     >
                       Kategorie {client.category || "C"}
                     </span>
@@ -462,11 +506,10 @@ export default function ClientDetailPage() {
                     </span>
 
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-black ${
-                        client.category === "Z"
-                          ? "bg-rose-100 text-rose-700"
-                          : "bg-emerald-100 text-emerald-700"
-                      }`}
+                      className={`rounded-full px-3 py-1 text-xs font-black ${client.category === "Z"
+                        ? "bg-rose-100 text-rose-700"
+                        : "bg-emerald-100 text-emerald-700"
+                        }`}
                     >
                       {client.category === "Z" ? "Gesperrt" : "Aktiv"}
                     </span>
@@ -975,11 +1018,10 @@ export default function ClientDetailPage() {
                             key={page}
                             type="button"
                             onClick={() => setServicePage(page)}
-                            className={`flex h-10 min-w-10 items-center justify-center rounded-xl px-3 text-sm font-black transition-all ${
-                              active
-                                ? "bg-blue-600 text-white"
-                                : "border border-slate-200 text-slate-600 hover:border-blue-200 hover:text-blue-600"
-                            }`}
+                            className={`flex h-10 min-w-10 items-center justify-center rounded-xl px-3 text-sm font-black transition-all ${active
+                              ? "bg-blue-600 text-white"
+                              : "border border-slate-200 text-slate-600 hover:border-blue-200 hover:text-blue-600"
+                              }`}
                           >
                             {page}
                           </button>
