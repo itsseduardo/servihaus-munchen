@@ -23,7 +23,7 @@ type EmployeeProfile = {
   inactiveUntil?: string | null
 }
 
-type DateFilter = "today" | "tomorrow" | "history"
+type DateFilter = "today" | "tomorrow" | "month" | "history"
 
 function getInactiveReasonLabel(reason?: string | null) {
   switch (reason) {
@@ -37,6 +37,8 @@ function getInactiveReasonLabel(reason?: string | null) {
       return "Suspendiert"
     case "VACATION":
       return "Urlaub / Freistellung"
+    case "UNPAID_VACATION":
+      return "Unbezahlter Urlaub"
     case "OTHER":
       return "Sonstiges"
     default:
@@ -58,78 +60,116 @@ function formatDate(dateValue?: string | null) {
   })
 }
 
-function InactiveEmployeeScreen({
+function startOfDay(date: Date) {
+  const copy = new Date(date)
+  copy.setHours(0, 0, 0, 0)
+  return copy
+}
+
+function endOfDay(date: Date) {
+  const copy = new Date(date)
+  copy.setHours(23, 59, 59, 999)
+  return copy
+}
+
+function isEmployeeInactiveOnDate(
+  employee: EmployeeProfile | null,
+  dateValue: Date = new Date()
+) {
+  if (!employee) return false
+
+  const isMarkedInactive =
+    employee.isActive === false || employee.active === false
+
+  if (!isMarkedInactive) return false
+
+  const targetDate = startOfDay(dateValue)
+
+  const inactiveSince = employee.inactiveSince
+    ? startOfDay(new Date(employee.inactiveSince))
+    : null
+
+  const inactiveUntil = employee.inactiveUntil
+    ? endOfDay(new Date(employee.inactiveUntil))
+    : null
+
+  if (inactiveSince && targetDate < inactiveSince) {
+    return false
+  }
+
+  if (inactiveUntil && targetDate > inactiveUntil) {
+    return false
+  }
+
+  return true
+}
+
+function InactiveEmployeeBanner({
   employee,
 }: {
   employee: EmployeeProfile
 }) {
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-6 pb-24">
-      <section className="mx-auto flex min-h-[75vh] max-w-xl items-center justify-center">
-        <div className="w-full rounded-[2rem] border border-rose-100 bg-white p-6 text-center shadow-sm">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[2rem] bg-rose-50 text-rose-600">
-            <span className="material-symbols-outlined text-5xl">
-              lock_person
-            </span>
-          </div>
+    <div className="mt-6 rounded-[2rem] border border-rose-100 bg-rose-50 p-5 shadow-sm">
+      <div className="flex items-start gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-rose-600 shadow-sm">
+          <span className="material-symbols-outlined">lock_person</span>
+        </div>
 
-          <p className="mt-6 text-xs font-black uppercase tracking-[0.18em] text-rose-500">
-            Konto inaktiv
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-rose-500">
+            Konto vorübergehend inaktiv
           </p>
 
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-            Ihr Konto ist derzeit inaktiv
-          </h1>
+          <h2 className="mt-2 text-xl font-black text-rose-950">
+            {getInactiveReasonLabel(employee.inactiveReason)}
+          </h2>
 
-          <p className="mx-auto mt-3 max-w-md text-sm font-medium leading-7 text-slate-500">
-            Hallo {employee.firstName}, Ihr Mitarbeiterkonto wurde von der
-            Verwaltung vorübergehend deaktiviert. Während dieser Zeit können
-            keine Aufgaben bearbeitet oder Schichten gestartet werden.
+          <p className="mt-2 text-sm font-bold leading-6 text-rose-700">
+            Während dieser Zeit kannst du deine geplanten Aufgaben ansehen, aber
+            keine Schicht starten oder Aufgaben bearbeiten.
           </p>
 
-          <div className="mt-6 grid gap-3 text-left">
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
-                Grund
-              </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {employee.inactiveSince && (
+              <div className="rounded-2xl bg-white/70 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-rose-400">
+                  Seit
+                </p>
 
-              <p className="mt-1 text-sm font-black text-slate-800">
-                {getInactiveReasonLabel(employee.inactiveReason)}
-              </p>
-            </div>
+                <p className="mt-1 text-sm font-black text-rose-900">
+                  {formatDate(employee.inactiveSince)}
+                </p>
+              </div>
+            )}
 
             {employee.inactiveUntil && (
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+              <div className="rounded-2xl bg-white/70 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-rose-400">
                   Voraussichtlich bis
                 </p>
 
-                <p className="mt-1 text-sm font-black text-slate-800">
+                <p className="mt-1 text-sm font-black text-rose-900">
                   {formatDate(employee.inactiveUntil)}
                 </p>
               </div>
             )}
-
-            {employee.inactiveDetails && (
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
-                  Hinweis
-                </p>
-
-                <p className="mt-1 text-sm font-medium leading-6 text-slate-700">
-                  {employee.inactiveDetails}
-                </p>
-              </div>
-            )}
           </div>
 
-          <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 px-5 py-4 text-sm font-bold text-blue-700">
-            Bitte kontaktieren Sie die Verwaltung, wenn Sie Fragen zu Ihrem
-            Status haben.
-          </div>
+          {employee.inactiveDetails && (
+            <div className="mt-3 rounded-2xl bg-white/70 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-rose-400">
+                Hinweis
+              </p>
+
+              <p className="mt-1 text-sm font-medium leading-6 text-rose-800">
+                {employee.inactiveDetails}
+              </p>
+            </div>
+          )}
         </div>
-      </section>
-    </main>
+      </div>
+    </div>
   )
 }
 
@@ -148,6 +188,8 @@ export default function EmployeeDashboardPage() {
   const [selectedServiceInfo, setSelectedServiceInfo] = useState<any | null>(
     null
   )
+
+  const isInactiveToday = isEmployeeInactiveOnDate(employee, new Date())
 
   useEffect(() => {
     async function loadEmployee() {
@@ -175,7 +217,7 @@ export default function EmployeeDashboardPage() {
 
   useEffect(() => {
     async function fetchTasks() {
-      if (!employee || employee.isActive === false) return
+      if (!employee) return
       if (bottomTab !== "home") return
 
       setIsLoading(true)
@@ -188,9 +230,12 @@ export default function EmployeeDashboardPage() {
         if (res.ok) {
           const data = await res.json()
           setTasks(Array.isArray(data) ? data : [])
+        } else {
+          setTasks([])
         }
       } catch (error) {
         console.error("TASK LOAD ERROR:", error)
+        setTasks([])
       } finally {
         setIsLoading(false)
       }
@@ -200,6 +245,8 @@ export default function EmployeeDashboardPage() {
   }, [dateFilter, bottomTab, employee])
 
   const handleTaskUpdate = (updatedTask: any) => {
+    if (isInactiveToday) return
+
     setTasks((prev) =>
       prev.map((task) => (task.id === updatedTask.id ? updatedTask : task))
     )
@@ -209,9 +256,7 @@ export default function EmployeeDashboardPage() {
   const currentBottomActive =
     bottomTab === "profile"
       ? "profile"
-      : dateFilter === "history"
-        ? "history"
-        : "today"
+      : "today"
 
   function getGreeting() {
     const hour = new Date().getHours()
@@ -220,6 +265,21 @@ export default function EmployeeDashboardPage() {
     if (hour < 18) return "Guten Tag"
     if (hour < 22) return "Guten Abend"
     return "Gute Nacht"
+  }
+
+  function getFilterTitle() {
+    switch (dateFilter) {
+      case "today":
+        return "Heute"
+      case "tomorrow":
+        return "Morgen"
+      case "month":
+        return "Dieser Monat"
+      case "history":
+        return "Historie"
+      default:
+        return "Aufgaben"
+    }
   }
 
   const currentDate = new Date().toLocaleDateString("de-DE", {
@@ -236,24 +296,17 @@ export default function EmployeeDashboardPage() {
     )
   }
 
-  if (employee && employee.isActive === false) {
-    return (
-      <>
-        <InactiveEmployeeScreen employee={employee} />
-        <BottomNav
-          active="today"
-          onTabChange={() => { }}
-          onOpenMaterial={() => { }}
-        />
-      </>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-6 pb-[calc(120px+env(safe-area-inset-bottom))]">
       {bottomTab === "home" ? (
         <>
-          <header className="relative overflow-hidden rounded-[2rem] bg-blue-600 p-6 text-white shadow-xl shadow-blue-100">
+          <header
+            className={`relative overflow-hidden rounded-[2rem] p-6 text-white shadow-xl ${
+              isInactiveToday
+                ? "bg-gradient-to-r from-slate-700 to-slate-600 shadow-slate-200"
+                : "bg-blue-600 shadow-blue-100"
+            }`}
+          >
             <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
 
             <div className="relative z-10 flex items-center justify-between">
@@ -272,7 +325,7 @@ export default function EmployeeDashboardPage() {
             </div>
 
             <div className="relative z-10 mt-8">
-              <p className="text-sm font-bold text-blue-100">
+              <p className="text-sm font-bold text-white/80">
                 {getGreeting()},
               </p>
 
@@ -280,21 +333,28 @@ export default function EmployeeDashboardPage() {
                 {employee?.firstName || "Team"}!
               </h1>
 
-              <p className="mt-3 text-sm font-medium text-blue-50">
-                Hier sind deine Aufgaben.
+              <p className="mt-3 text-sm font-medium text-white/80">
+                {isInactiveToday
+                  ? "Du kannst deine geplanten Aufgaben ansehen."
+                  : "Hier sind deine Aufgaben."}
               </p>
             </div>
           </header>
 
+          {employee && isInactiveToday && (
+            <InactiveEmployeeBanner employee={employee} />
+          )}
+
           <div className="mt-6">
-            <div className="grid grid-cols-3 gap-2 rounded-2xl bg-slate-100 p-1">
+            <div className="grid grid-cols-4 gap-2 rounded-2xl bg-slate-100 p-1">
               <button
                 type="button"
                 onClick={() => setDateFilter("today")}
-                className={`rounded-xl py-2.5 text-[11px] font-black uppercase tracking-wider transition-all ${dateFilter === "today"
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-slate-500"
-                  }`}
+                className={`rounded-xl py-2.5 text-[10px] font-black uppercase tracking-wider transition-all sm:text-[11px] ${
+                  dateFilter === "today"
+                    ? "bg-white text-blue-600 shadow-sm"
+                    : "text-slate-500"
+                }`}
               >
                 Heute
               </button>
@@ -302,34 +362,82 @@ export default function EmployeeDashboardPage() {
               <button
                 type="button"
                 onClick={() => setDateFilter("tomorrow")}
-                className={`rounded-xl py-2.5 text-[11px] font-black uppercase tracking-wider transition-all ${dateFilter === "tomorrow"
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-slate-500"
-                  }`}
+                className={`rounded-xl py-2.5 text-[10px] font-black uppercase tracking-wider transition-all sm:text-[11px] ${
+                  dateFilter === "tomorrow"
+                    ? "bg-white text-blue-600 shadow-sm"
+                    : "text-slate-500"
+                }`}
               >
                 Morgen
               </button>
 
               <button
                 type="button"
+                onClick={() => setDateFilter("month")}
+                className={`rounded-xl py-2.5 text-[10px] font-black uppercase tracking-wider transition-all sm:text-[11px] ${
+                  dateFilter === "month"
+                    ? "bg-white text-blue-600 shadow-sm"
+                    : "text-slate-500"
+                }`}
+              >
+                Monat
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setDateFilter("history")}
-                className={`rounded-xl py-2.5 text-[11px] font-black uppercase tracking-wider transition-all ${dateFilter === "history"
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-slate-500"
-                  }`}
+                className={`rounded-xl py-2.5 text-[10px] font-black uppercase tracking-wider transition-all sm:text-[11px] ${
+                  dateFilter === "history"
+                    ? "bg-white text-blue-600 shadow-sm"
+                    : "text-slate-500"
+                }`}
               >
                 Historie
               </button>
             </div>
           </div>
 
-          {dateFilter === "today" && (
+          {dateFilter === "today" && !isInactiveToday && (
             <div className="mt-6">
               <TimeTracker onShiftChange={setIsShiftActive} />
             </div>
           )}
 
+          {dateFilter === "today" && isInactiveToday && (
+            <div className="mt-6 rounded-[2rem] border border-slate-100 bg-white p-5 text-center shadow-sm">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
+                <span className="material-symbols-outlined">lock_clock</span>
+              </div>
+
+              <h2 className="mt-4 text-xl font-black text-slate-950">
+                Schichtstart deaktiviert
+              </h2>
+
+              <p className="mx-auto mt-2 max-w-md text-sm font-medium leading-6 text-slate-500">
+                Dein Konto ist für den heutigen Tag inaktiv. Du kannst deine
+                Aufgaben sehen, aber keine Zeiten oder Statusänderungen
+                erfassen.
+              </p>
+            </div>
+          )}
+
           <section className="mt-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">
+                  {getFilterTitle()}
+                </p>
+
+                <h2 className="mt-1 text-2xl font-black text-slate-950">
+                  Meine Aufgaben
+                </h2>
+              </div>
+
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-500 shadow-sm">
+                {tasks.length}
+              </span>
+            </div>
+
             {isLoading ? (
               <div className="flex h-40 items-center justify-center rounded-[2rem] bg-white shadow-sm">
                 <span className="material-symbols-outlined animate-spin text-4xl text-blue-600">
@@ -337,7 +445,7 @@ export default function EmployeeDashboardPage() {
                 </span>
               </div>
             ) : tasks.length === 0 ? (
-              <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
+              <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white px-6 py-10 text-center shadow-sm">
                 <span className="material-symbols-outlined text-5xl text-slate-300">
                   task
                 </span>
@@ -351,27 +459,56 @@ export default function EmployeeDashboardPage() {
                 </p>
               </div>
             ) : (
-              <div className="grid gap-4">
-                {tasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onOvertimeTriggered={setTaskNeedingOvertime}
-                    onStatusUpdated={handleTaskUpdate}
-                    onOpenInfo={() => setSelectedServiceInfo(task)}
-                  />
-                ))}
-              </div>
-            )}
+              <div className="relative">
+                {isInactiveToday && (
+                  <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50 px-5 py-4 text-sm font-bold leading-6 text-amber-700">
+                    <div className="flex items-start gap-3">
+                      <span className="material-symbols-outlined mt-0.5">
+                        visibility
+                      </span>
+                      Du befindest dich im Ansichtsmodus. Aufgaben sind sichtbar,
+                      aber Aktionen sind während der Inaktivität gesperrt.
+                    </div>
+                  </div>
+                )}
 
-            {!isShiftActive && dateFilter === "today" && tasks.length > 0 && (
-              <div className="mt-5 rounded-2xl border border-amber-100 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-700">
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined">lock_clock</span>
-                  Starte deine Schicht, um die Aufgaben zu bearbeiten.
+                <div
+                  className={`grid gap-4 ${
+                    isInactiveToday ? "pointer-events-none opacity-90" : ""
+                  }`}
+                >
+                  {tasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onOvertimeTriggered={(taskToUpdate: any) => {
+                        if (isInactiveToday) return
+                        setTaskNeedingOvertime(taskToUpdate)
+                      }}
+                      onStatusUpdated={handleTaskUpdate}
+                      onOpenInfo={() => {
+                        if (isInactiveToday) return
+                        setSelectedServiceInfo(task)
+                      }}
+                    />
+                  ))}
                 </div>
               </div>
             )}
+
+            {!isShiftActive &&
+              !isInactiveToday &&
+              dateFilter === "today" &&
+              tasks.length > 0 && (
+                <div className="mt-5 rounded-2xl border border-amber-100 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-700">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined">
+                      lock_clock
+                    </span>
+                    Starte deine Schicht, um die Aufgaben zu bearbeiten.
+                  </div>
+                </div>
+              )}
           </section>
         </>
       ) : (
@@ -391,10 +528,13 @@ export default function EmployeeDashboardPage() {
             setDateFilter("today")
           }
         }}
-        onOpenMaterial={() => setShowMaterialModal(true)}
+        onOpenMaterial={() => {
+          if (isInactiveToday) return
+          setShowMaterialModal(true)
+        }}
       />
 
-      {taskNeedingOvertime && (
+      {taskNeedingOvertime && !isInactiveToday && (
         <OvertimeModal
           task={taskNeedingOvertime}
           onClose={() => setTaskNeedingOvertime(null)}
@@ -402,7 +542,7 @@ export default function EmployeeDashboardPage() {
         />
       )}
 
-      {showMaterialModal && (
+      {showMaterialModal && !isInactiveToday && (
         <MaterialModal
           tasks={tasks}
           onClose={() => setShowMaterialModal(false)}

@@ -65,6 +65,8 @@ function getInactiveReasonLabel(reason?: string | null) {
       return "Urlaub / Freistellung"
     case "OTHER":
       return "Sonstiges"
+    case "UNPAID_VACATION":
+      return "Unbezahltener Urlaub"
     default:
       return "Nicht angegeben"
   }

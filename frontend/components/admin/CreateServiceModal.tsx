@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { isEmployeeAssignableOnDate } from "@/lib/employee-availability"
 
 type PricingModel = "TIME" | "FIXED"
 
@@ -25,6 +26,12 @@ type EmployeeOption = {
   fullName?: string | null
   profession?: string | null
   email?: string | null
+  active?: boolean | null
+  isActive?: boolean | null
+  inactiveReason?: string | null
+  inactiveDetails?: string | null
+  inactiveSince?: string | Date | null
+  inactiveUntil?: string | Date | null
 }
 
 type ServiceCode = {
@@ -151,6 +158,7 @@ export default function CreateServiceModal({
 
     return employees
       .filter((employee) => !selectedEmployees.includes(Number(employee.id)))
+      .filter((employee) => isEmployeeAssignableOnDate(employee, serviceDate))
       .filter((employee) => {
         const name = getEmployeeName(employee).toLowerCase()
         const email = employee.email?.toLowerCase() || ""
@@ -163,7 +171,7 @@ export default function CreateServiceModal({
         )
       })
       .slice(0, 8)
-  }, [employees, selectedEmployees, employeeSearch])
+  }, [employees, selectedEmployees, employeeSearch, serviceDate])
 
   useEffect(() => {
     setTime(initialTime)
@@ -574,11 +582,10 @@ export default function CreateServiceModal({
                   <button
                     type="button"
                     onClick={() => setPricingModel("TIME")}
-                    className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
-                      pricingModel === "TIME"
-                        ? "bg-white text-blue-600 shadow-sm dark:bg-slate-800"
-                        : "text-slate-500"
-                    }`}
+                    className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${pricingModel === "TIME"
+                      ? "bg-white text-blue-600 shadow-sm dark:bg-slate-800"
+                      : "text-slate-500"
+                      }`}
                   >
                     Zeitbasiert (h)
                   </button>
@@ -586,11 +593,10 @@ export default function CreateServiceModal({
                   <button
                     type="button"
                     onClick={() => setPricingModel("FIXED")}
-                    className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
-                      pricingModel === "FIXED"
-                        ? "bg-white text-blue-600 shadow-sm dark:bg-slate-800"
-                        : "text-slate-500"
-                    }`}
+                    className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${pricingModel === "FIXED"
+                      ? "bg-white text-blue-600 shadow-sm dark:bg-slate-800"
+                      : "text-slate-500"
+                      }`}
                   >
                     Pauschal (Fest)
                   </button>
@@ -872,11 +878,10 @@ export default function CreateServiceModal({
                               onClick={() =>
                                 handleToggleRecurrenceDay(day.value)
                               }
-                              className={`h-9 rounded-lg border text-[11px] font-bold transition ${
-                                selected
-                                  ? "border-blue-600 bg-blue-600 text-white"
-                                  : "bg-white dark:border-slate-700 dark:bg-slate-800"
-                              }`}
+                              className={`h-9 rounded-lg border text-[11px] font-bold transition ${selected
+                                ? "border-blue-600 bg-blue-600 text-white"
+                                : "bg-white dark:border-slate-700 dark:bg-slate-800"
+                                }`}
                             >
                               {day.label}
                             </button>

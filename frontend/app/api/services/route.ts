@@ -11,6 +11,8 @@ const WEEKDAY_MAP: Record<string, number> = {
   SAT: 6,
 }
 
+const MAX_RECURRENCES = 100
+
 function parseDateParts(dateString: string) {
   const [year, month, day] = dateString.slice(0, 10).split("-").map(Number)
 
@@ -24,8 +26,7 @@ function parseDateParts(dateString: string) {
 function makeUtcDateOnly(dateString: string) {
   const { year, month, day } = parseDateParts(dateString)
 
-  // Guardamos la fecha calendario al mediodía UTC para evitar que
-  // se visualice como el día anterior en zonas horarias negativas.
+  // Guardamos la fecha calendario al mediodía UTC para evitar desfases de día.
   return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0))
 }
 
@@ -86,6 +87,123 @@ function addUtcMonths(date: Date, months: number) {
   const copy = cloneUtcDateOnly(date)
   copy.setUTCMonth(copy.getUTCMonth() + months)
   return copy
+}
+
+function formatUtcDateForMessage(date: Date) {
+  return date.toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "UTC",
+  })
+}
+
+function isEmployeeInactiveForDate(employee: any, date: Date) {
+  const isMarkedInactive =
+    employee.isActive === false || employee.active === false
+
+  if (!isMarkedInactive) return false
+
+  const targetDate = new Date(date)
+  targetDate.setUTCHours(0, 0, 0, 0)
+
+  const inactiveSince = employee.inactiveSince
+    ? new Date(employee.inactiveSince)
+    : null
+
+  if (inactiveSince) {
+    inactiveSince.setUTCHours(0, 0, 0, 0)
+  }
+
+  const inactiveUntil = employee.inactiveUntil
+    ? new Date(employee.inactiveUntil)
+    : null
+
+  if (inactiveUntil) {
+    inactiveUntil.setUTCHours(23, 59, 59, 999)
+  }
+
+  // Si la inactividad todavía no empezó, se puede asignar.
+  if (inactiveSince && targetDate < inactiveSince) return false
+
+  // Si tiene fecha final y el servicio es después, se puede asignar.
+  if (inactiveUntil && targetDate > inactiveUntil) return false
+
+  // Si está inactivo sin fecha final, queda bloqueado desde inactiveSince o indefinidamente.
+  return true
+}
+
+function buildAllServiceDates({
+  serviceDate,
+  isRecurring,
+  recurrenceRule,
+  recurrenceEndDate,
+  recurrenceDays,
+  interval,
+}: {
+  serviceDate: Date
+  isRecurring: boolean
+  recurrenceRule?: string | null
+  recurrenceEndDate?: Date | null
+  recurrenceDays?: string[] | null
+  interval: number
+}) {
+  const dates: Date[] = [cloneUtcDateOnly(serviceDate)]
+
+  if (!isRecurring || !recurrenceRule || !recurrenceEndDate) {
+    return dates
+  }
+
+  let safetyCounter = 0
+
+  if (recurrenceRule === "WEEKLY" && recurrenceDays?.length) {
+    let weekCursor = cloneUtcDateOnly(serviceDate)
+
+    while (weekCursor <= recurrenceEndDate && safetyCounter < MAX_RECURRENCES) {
+      for (const dayCode of recurrenceDays) {
+        const targetDay = WEEKDAY_MAP[dayCode]
+
+        if (targetDay === undefined) continue
+
+        const tempDate = cloneUtcDateOnly(weekCursor)
+        const currentDay = tempDate.getUTCDay()
+        const diff = targetDay - currentDay
+
+        tempDate.setUTCDate(tempDate.getUTCDate() + diff)
+        tempDate.setUTCHours(12, 0, 0, 0)
+
+        if (tempDate > serviceDate && tempDate <= recurrenceEndDate) {
+          dates.push(cloneUtcDateOnly(tempDate))
+          safetyCounter++
+        }
+      }
+
+      weekCursor = addUtcDays(weekCursor, 7 * interval)
+    }
+
+    return dates
+  }
+
+  let currentPointer = cloneUtcDateOnly(serviceDate)
+
+  while (safetyCounter < MAX_RECURRENCES) {
+    if (recurrenceRule === "DAILY") {
+      currentPointer = addUtcDays(currentPointer, interval)
+    } else if (recurrenceRule === "BIWEEKLY") {
+      currentPointer = addUtcDays(currentPointer, 14)
+    } else if (recurrenceRule === "MONTHLY") {
+      currentPointer = addUtcMonths(currentPointer, interval)
+    } else {
+      break
+    }
+
+    if (currentPointer > recurrenceEndDate) break
+
+    dates.push(cloneUtcDateOnly(currentPointer))
+    safetyCounter++
+  }
+
+  return dates
 }
 
 async function createRecurringInstance(
@@ -184,6 +302,67 @@ export async function POST(req: Request) {
     const serviceDate = makeUtcDateOnly(date)
     const startTime = makeUtcDateTime(date, time)
 
+    const employeeIds = Array.isArray(employees)
+      ? employees.map((id: any) => Number(id)).filter(Number.isInteger)
+      : []
+
+    const recurrenceEndDate =
+      isRecurring && recurrenceEnd ? makeUtcDateEnd(recurrenceEnd) : null
+
+    const allServiceDates = buildAllServiceDates({
+      serviceDate,
+      isRecurring: Boolean(isRecurring),
+      recurrenceRule,
+      recurrenceEndDate,
+      recurrenceDays,
+      interval,
+    })
+
+    if (employeeIds.length > 0) {
+      const selectedEmployees = await prisma.employee.findMany({
+        where: {
+          id: {
+            in: employeeIds,
+          },
+        },
+      })
+
+      const conflicts: {
+        id: number
+        name: string
+        date: string
+        inactiveReason: string | null
+        inactiveUntil: Date | null
+      }[] = []
+
+      for (const employee of selectedEmployees) {
+        for (const serviceDateItem of allServiceDates) {
+          if (isEmployeeInactiveForDate(employee, serviceDateItem)) {
+            conflicts.push({
+              id: employee.id,
+              name: `${employee.firstName} ${employee.lastName}`,
+              date: formatUtcDateForMessage(serviceDateItem),
+              inactiveReason: employee.inactiveReason,
+              inactiveUntil: employee.inactiveUntil,
+            })
+
+            break
+          }
+        }
+      }
+
+      if (conflicts.length > 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Ein oder mehrere Mitarbeiter sind für dieses Datum nicht verfügbar.",
+            employees: conflicts,
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     let client = clientId
       ? await prisma.client.findUnique({
           where: { id: Number(clientId) },
@@ -213,9 +392,6 @@ export async function POST(req: Request) {
       })
     }
 
-    const recurrenceEndDate =
-      isRecurring && recurrenceEnd ? makeUtcDateEnd(recurrenceEnd) : null
-
     const baseService = await prisma.service.create({
       data: {
         serviceCodeId: serviceCodeId ? Number(serviceCodeId) : null,
@@ -236,9 +412,9 @@ export async function POST(req: Request) {
         notes: notes || null,
         importantNotes: importantNotes || null,
         clientId: client.id,
-        assignments: employees?.length
+        assignments: employeeIds.length
           ? {
-              create: employees.map((id: number) => ({
+              create: employeeIds.map((id: number) => ({
                 employee: {
                   connect: { id },
                 },
@@ -249,72 +425,18 @@ export async function POST(req: Request) {
     })
 
     if (isRecurring && recurrenceRule && recurrenceEndDate) {
-      let safetyCounter = 0
-      const MAX_RECURRENCES = 100
-      const employeeIds = Array.isArray(employees) ? employees : []
+      const recurringDates = allServiceDates.slice(1)
 
-      if (recurrenceRule === "WEEKLY" && recurrenceDays?.length > 0) {
-        let weekCursor = cloneUtcDateOnly(serviceDate)
-
-        while (weekCursor <= recurrenceEndDate && safetyCounter < MAX_RECURRENCES) {
-          for (const dayCode of recurrenceDays) {
-            const targetDay = WEEKDAY_MAP[dayCode]
-
-            if (targetDay === undefined) continue
-
-            const tempDate = cloneUtcDateOnly(weekCursor)
-
-            const currentDay = tempDate.getUTCDay()
-            const diff = targetDay - currentDay
-
-            tempDate.setUTCDate(tempDate.getUTCDate() + diff)
-            tempDate.setUTCHours(12, 0, 0, 0)
-
-            if (tempDate > serviceDate && tempDate <= recurrenceEndDate) {
-              await createRecurringInstance(
-                tempDate,
-                hours,
-                minutes,
-                baseService.id,
-                client.id,
-                body,
-                employeeIds
-              )
-
-              safetyCounter++
-            }
-          }
-
-          weekCursor = addUtcDays(weekCursor, 7 * interval)
-        }
-      } else {
-        let currentPointer = cloneUtcDateOnly(serviceDate)
-
-        while (safetyCounter < MAX_RECURRENCES) {
-          if (recurrenceRule === "DAILY") {
-            currentPointer = addUtcDays(currentPointer, interval)
-          } else if (recurrenceRule === "BIWEEKLY") {
-            currentPointer = addUtcDays(currentPointer, 14)
-          } else if (recurrenceRule === "MONTHLY") {
-            currentPointer = addUtcMonths(currentPointer, interval)
-          } else {
-            break
-          }
-
-          if (currentPointer > recurrenceEndDate) break
-
-          await createRecurringInstance(
-            currentPointer,
-            hours,
-            minutes,
-            baseService.id,
-            client.id,
-            body,
-            employeeIds
-          )
-
-          safetyCounter++
-        }
+      for (const recurringDate of recurringDates) {
+        await createRecurringInstance(
+          recurringDate,
+          hours,
+          minutes,
+          baseService.id,
+          client.id,
+          body,
+          employeeIds
+        )
       }
     }
 

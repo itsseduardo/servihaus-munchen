@@ -21,6 +21,53 @@ function isAllowedStatus(status: unknown): status is AllowedStatus {
   )
 }
 
+function startOfDay(date: Date) {
+  const copy = new Date(date)
+  copy.setHours(0, 0, 0, 0)
+  return copy
+}
+
+function endOfDay(date: Date) {
+  const copy = new Date(date)
+  copy.setHours(23, 59, 59, 999)
+  return copy
+}
+
+function isEmployeeInactiveOnDate(
+  employee: {
+    active?: boolean | null
+    isActive?: boolean | null
+    inactiveSince?: Date | null
+    inactiveUntil?: Date | null
+  },
+  dateValue: Date = new Date()
+) {
+  const isMarkedInactive =
+    employee.isActive === false || employee.active === false
+
+  if (!isMarkedInactive) return false
+
+  const targetDate = startOfDay(dateValue)
+
+  const inactiveSince = employee.inactiveSince
+    ? startOfDay(new Date(employee.inactiveSince))
+    : null
+
+  const inactiveUntil = employee.inactiveUntil
+    ? endOfDay(new Date(employee.inactiveUntil))
+    : null
+
+  if (inactiveSince && targetDate < inactiveSince) {
+    return false
+  }
+
+  if (inactiveUntil && targetDate > inactiveUntil) {
+    return false
+  }
+
+  return true
+}
+
 export async function PATCH(
   req: Request,
   context: { params: Promise<{ id: string }> }
@@ -54,6 +101,7 @@ export async function PATCH(
 
     const body = await req.json()
     const status = body.status
+
     const overtimeReason =
       typeof body.overtimeReason === "string"
         ? body.overtimeReason.trim()
@@ -79,6 +127,21 @@ export async function PATCH(
       return NextResponse.json(
         { error: "Empleado no encontrado" },
         { status: 404 }
+      )
+    }
+
+    const employeeIsInactiveToday = isEmployeeInactiveOnDate(
+      user.employee,
+      new Date()
+    )
+
+    if (employeeIsInactiveToday) {
+      return NextResponse.json(
+        {
+          error:
+            "Tu cuenta está inactiva actualmente. Puedes ver tus tareas, pero no puedes cambiar estados ni registrar tiempos.",
+        },
+        { status: 403 }
       )
     }
 

@@ -37,19 +37,19 @@ async function requireAdmin() {
   }
 }
 
-function buildScopedWhere(service: {
-  id: number
-  date: Date
-  parentServiceId: number | null
-}, scope: Scope) {
+function buildScopedWhere(
+  service: {
+    id: number
+    date: Date
+    parentServiceId: number | null
+  },
+  scope: Scope
+) {
   const parentId = service.parentServiceId ?? service.id
 
   if (scope === "ALL") {
     return {
-      OR: [
-        { id: parentId },
-        { parentServiceId: parentId },
-      ],
+      OR: [{ id: parentId }, { parentServiceId: parentId }],
     }
   }
 
@@ -70,6 +70,70 @@ function buildScopedWhere(service: {
   return {
     id: service.id,
   }
+}
+
+function formatUtcDateForMessage(date: Date) {
+  return date.toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "UTC",
+  })
+}
+
+function isEmployeeInactiveForDate(employee: any, date: Date) {
+  const isMarkedInactive =
+    employee.isActive === false || employee.active === false
+
+  if (!isMarkedInactive) return false
+
+  const targetDate = new Date(date)
+  targetDate.setUTCHours(0, 0, 0, 0)
+
+  const inactiveSince = employee.inactiveSince
+    ? new Date(employee.inactiveSince)
+    : null
+
+  if (inactiveSince) {
+    inactiveSince.setUTCHours(0, 0, 0, 0)
+  }
+
+  const inactiveUntil = employee.inactiveUntil
+    ? new Date(employee.inactiveUntil)
+    : null
+
+  if (inactiveUntil) {
+    inactiveUntil.setUTCHours(23, 59, 59, 999)
+  }
+
+  if (inactiveSince && targetDate < inactiveSince) return false
+  if (inactiveUntil && targetDate > inactiveUntil) return false
+
+  return true
+}
+
+function getTargetDateForAffectedService({
+  item,
+  service,
+  newDate,
+  dateDeltaMs,
+  scope,
+  hasDateUpdate,
+}: {
+  item: { id: number; date: Date }
+  service: { id: number; date: Date }
+  newDate: Date | null
+  dateDeltaMs: number
+  scope: Scope
+  hasDateUpdate: boolean
+}) {
+  if (!hasDateUpdate) return item.date
+
+  if (scope === "THIS") {
+    return item.id === service.id && newDate ? newDate : item.date
+  }
+
+  return new Date(item.date.getTime() + dateDeltaMs)
 }
 
 async function createServiceAuditLogs({
@@ -175,8 +239,7 @@ export async function PUT(
     if ((scheduleChanged || manualTimeChanged) && !changeReason) {
       return NextResponse.json(
         {
-          error:
-            "Bitte geben Sie einen Grund für die Änderung an.",
+          error: "Bitte geben Sie einen Grund für die Änderung an.",
         },
         { status: 400 }
       )
@@ -223,6 +286,13 @@ export async function PUT(
     const newDate = body.date ? new Date(body.date) : null
     const newStartTime = body.startTime ? new Date(body.startTime) : null
 
+    if (body.date !== undefined && !newDate) {
+      return NextResponse.json(
+        { error: "Invalid date" },
+        { status: 400 }
+      )
+    }
+
     const dateDeltaMs =
       newDate && service.date
         ? newDate.getTime() - service.date.getTime()
@@ -240,6 +310,60 @@ export async function PUT(
         .map((value: unknown) => Number(value))
         .filter((value: number) => Number.isInteger(value))
       : []
+
+    if (hasEmployeeUpdate && employeeIds.length > 0) {
+      const selectedEmployees = await prisma.employee.findMany({
+        where: {
+          id: {
+            in: employeeIds,
+          },
+        },
+      })
+
+      const conflicts: {
+        id: number
+        name: string
+        date: string
+        inactiveReason: string | null
+        inactiveUntil: Date | null
+      }[] = []
+
+      for (const employee of selectedEmployees) {
+        for (const item of affectedServices) {
+          const targetDate = getTargetDateForAffectedService({
+            item,
+            service,
+            newDate,
+            dateDeltaMs,
+            scope,
+            hasDateUpdate: body.date !== undefined,
+          })
+
+          if (isEmployeeInactiveForDate(employee, targetDate)) {
+            conflicts.push({
+              id: employee.id,
+              name: `${employee.firstName} ${employee.lastName}`,
+              date: formatUtcDateForMessage(targetDate),
+              inactiveReason: employee.inactiveReason,
+              inactiveUntil: employee.inactiveUntil,
+            })
+
+            break
+          }
+        }
+      }
+
+      if (conflicts.length > 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Ein oder mehrere Mitarbeiter sind für dieses Datum nicht verfügbar.",
+            employees: conflicts,
+          },
+          { status: 400 }
+        )
+      }
+    }
 
     const updatedServices = await prisma.$transaction(async (tx) => {
       const results = []
@@ -298,7 +422,7 @@ export async function PUT(
 
         if (body.date !== undefined) {
           if (scope === "THIS") {
-            updateData.date = newDate ? { set: newDate } : { set: undefined }
+            updateData.date = newDate as Date
           } else {
             updateData.date = new Date(item.date.getTime() + dateDeltaMs)
           }
@@ -306,7 +430,7 @@ export async function PUT(
 
         if (body.startTime !== undefined) {
           if (!body.startTime) {
-            updateData.startTime = { set: undefined }
+            updateData.startTime = null
           } else if (scope === "THIS") {
             updateData.startTime = newStartTime
           } else if (item.startTime) {
@@ -321,13 +445,13 @@ export async function PUT(
         if (body.actualStartTime !== undefined) {
           updateData.actualStartTime = body.actualStartTime
             ? new Date(body.actualStartTime)
-            : { set: undefined }
+            : null
         }
 
         if (body.actualEndTime !== undefined) {
           updateData.actualEndTime = body.actualEndTime
             ? new Date(body.actualEndTime)
-            : { set: undefined }
+            : null
         }
 
         if (changeReason) {

@@ -25,6 +25,7 @@ const INACTIVE_REASONS = [
   { value: "TERMINATED", label: "Kündigung / Entlassung" },
   { value: "SUSPENDED", label: "Suspendiert" },
   { value: "VACATION", label: "Urlaub / Freistellung" },
+  { value: "UNPAID_VACATION", label: "Unbezahltener Urlaub" },
   { value: "OTHER", label: "Sonstiges" },
 ]
 

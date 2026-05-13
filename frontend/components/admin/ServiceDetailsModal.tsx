@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { isEmployeeAssignableOnDate } from "@/lib/employee-availability"
 
 interface Props {
   service: any
@@ -190,20 +191,20 @@ export default function ServiceDetailsModal({
 
       const body: any = isDelete
         ? {
-            scope: selectedScope,
-            reason:
-              changeReason.trim() ||
-              "Auftrag wurde vom Administrator storniert.",
-          }
+          scope: selectedScope,
+          reason:
+            changeReason.trim() ||
+            "Auftrag wurde vom Administrator storniert.",
+        }
         : {
-            notes,
-            importantNotes,
-            status,
-            pricingModel,
-            travelTime: Number(travelTime) || 0,
-            changeReason,
-            scope: selectedScope,
-          }
+          notes,
+          importantNotes,
+          status,
+          pricingModel,
+          travelTime: Number(travelTime) || 0,
+          changeReason,
+          scope: selectedScope,
+        }
 
       if (!isDelete) {
         if (hasDateChanged) {
@@ -468,37 +469,40 @@ export default function ServiceDetailsModal({
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {employees.map((employee) => {
-                  const employeeId = Number(employee.id)
-                  const selected = employeeIds.includes(employeeId)
-
-                  return (
-                    <button
-                      key={employee.id}
-                      type="button"
-                      onClick={() => {
-                        setEmployeeIds((prev) =>
-                          selected
-                            ? prev.filter((id) => id !== employeeId)
-                            : [...prev, employeeId]
-                        )
-                      }}
-                      className={`rounded-xl border-2 p-3 text-left transition-all ${
-                        selected
-                          ? "border-blue-500 bg-blue-50 text-blue-700 ring-4 ring-blue-500/10"
-                          : "border-slate-100 hover:border-slate-300 dark:border-slate-800"
-                      }`}
-                    >
-                      <p className="text-sm font-black">
-                        {getEmployeeName(employee)}
-                      </p>
-
-                      <p className="text-xs font-medium text-slate-500">
-                        {employee.profession || "Mitarbeiter"}
-                      </p>
-                    </button>
+                {employees
+                  .filter((employee) =>
+                    isEmployeeAssignableOnDate(employee, scheduledDate || service.date)
                   )
-                })}
+                  .map((employee) => {
+                    const employeeId = Number(employee.id)
+                    const selected = employeeIds.includes(employeeId)
+
+                    return (
+                      <button
+                        key={employee.id}
+                        type="button"
+                        onClick={() => {
+                          setEmployeeIds((prev) =>
+                            selected
+                              ? prev.filter((id) => id !== employeeId)
+                              : [...prev, employeeId]
+                          )
+                        }}
+                        className={`rounded-xl border-2 p-3 text-left transition-all ${selected
+                            ? "border-blue-500 bg-blue-50 text-blue-700 ring-4 ring-blue-500/10"
+                            : "border-slate-100 hover:border-slate-300 dark:border-slate-800"
+                          }`}
+                      >
+                        <p className="text-sm font-black">
+                          {getEmployeeName(employee)}
+                        </p>
+
+                        <p className="text-xs font-medium text-slate-500">
+                          {employee.profession || "Mitarbeiter"}
+                        </p>
+                      </button>
+                    )
+                  })}
               </div>
             )}
           </section>
@@ -642,11 +646,10 @@ export default function ServiceDetailsModal({
                   key={option.id}
                   type="button"
                   onClick={() => setScope(option.id as Scope)}
-                  className={`w-full rounded-2xl border-2 p-4 text-left transition-all ${
-                    scope === option.id
+                  className={`w-full rounded-2xl border-2 p-4 text-left transition-all ${scope === option.id
                       ? "border-blue-500 bg-blue-50 ring-4 ring-blue-500/10 dark:bg-blue-900/20"
                       : "border-slate-100 dark:border-slate-800"
-                  }`}
+                    }`}
                 >
                   <p className="text-sm font-bold">{option.title}</p>
                   <p className="text-[10px] font-medium text-slate-500">
