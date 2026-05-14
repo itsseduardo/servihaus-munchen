@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
 import AdminCalendarTopbar from "@/components/admin/AdminCalendarTopbar"
@@ -8,7 +8,7 @@ import WeeklyCalendar from "@/components/admin/WeeklyCalendar"
 import { useWeek } from "@/hooks/useWeek"
 import { ServiceType } from "@/types/service"
 
-export default function AdminCalendarPage() {
+function AdminCalendarContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -48,8 +48,7 @@ export default function AdminCalendarPage() {
     }
 
     fetchServices()
-    // Importante: NO usar "days" como dependencia.
-    // days puede ser un array nuevo en cada render y causar llamadas repetidas.
+    // Importante: no usamos "days" como dependencia para evitar llamadas repetidas.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWeek])
 
@@ -92,5 +91,19 @@ export default function AdminCalendarPage() {
         />
       </div>
     </>
+  )
+}
+
+export default function AdminCalendarPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-50">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
+        </div>
+      }
+    >
+      <AdminCalendarContent />
+    </Suspense>
   )
 }
