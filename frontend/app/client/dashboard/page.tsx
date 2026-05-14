@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+
 import ClientOnboardingModal from "@/components/client/ClientOnboardingModal"
+import ClientRequestModal from "@/components/client/ClientRequestModal"
 
 type OnboardingData = {
   firstName: string
@@ -45,12 +47,16 @@ type ClientDashboardData = {
   }
 }
 
+type ClientRequestType = "EXTRA_SERVICE"
+
 export default function ClientDashboardPage() {
   const [clientData, setClientData] = useState<ClientDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [savingOnboarding, setSavingOnboarding] = useState(false)
-  const [extraAdded, setExtraAdded] = useState(false)
   const [error, setError] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
+  const [requestModalType, setRequestModalType] =
+    useState<ClientRequestType | null>(null)
 
   useEffect(() => {
     async function loadClientData() {
@@ -124,11 +130,22 @@ export default function ClientDashboardPage() {
     }
   }
 
+  function handleRequestCreated() {
+    setRequestModalType(null)
+    setSuccessMessage(
+      "Ihre Anfrage wurde gesendet. Unser Team wird sie prüfen und sich bei Ihnen melden."
+    )
+
+    window.setTimeout(() => {
+      setSuccessMessage("")
+    }, 6000)
+  }
+
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
-        <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-8 flex flex-col items-center gap-4">
-          <div className="h-12 w-12 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin" />
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
+        <div className="flex flex-col items-center gap-4 rounded-3xl border border-slate-100 bg-white p-8 shadow-xl">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
 
           <p className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">
             Dashboard wird geladen
@@ -140,8 +157,8 @@ export default function ClientDashboardPage() {
 
   if (error && !clientData) {
     return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
-        <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-red-100 p-8 text-center">
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
+        <div className="w-full max-w-md rounded-3xl border border-red-100 bg-white p-8 text-center shadow-xl">
           <span className="material-symbols-outlined text-5xl text-red-500">
             error
           </span>
@@ -164,7 +181,7 @@ export default function ClientDashboardPage() {
     return (
       <>
         {error && (
-          <div className="fixed top-6 left-1/2 z-50 -translate-x-1/2 rounded-2xl bg-red-50 border border-red-100 px-5 py-3 text-sm font-bold text-red-700 shadow-lg">
+          <div className="fixed left-1/2 top-6 z-50 -translate-x-1/2 rounded-2xl border border-red-100 bg-red-50 px-5 py-3 text-sm font-bold text-red-700 shadow-lg">
             {error}
           </div>
         )}
@@ -201,8 +218,14 @@ export default function ClientDashboardPage() {
           </div>
         )}
 
+        {successMessage && (
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-700">
+            {successMessage}
+          </div>
+        )}
+
         {/* BIENVENIDA */}
-        <div className="rounded-[2rem] bg-white p-6 shadow-sm border border-slate-100">
+        <div className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-sm">
           <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">
             Kundenportal
           </p>
@@ -218,7 +241,7 @@ export default function ClientDashboardPage() {
 
         {/* PRÓXIMO SERVICIO + RECOMENDACIÓN */}
         <div className="grid gap-6 lg:grid-cols-[1.4fr_0.9fr]">
-          <div className="overflow-hidden rounded-[2rem] bg-white shadow-sm border border-slate-100">
+          <div className="overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-sm">
             <div className="border-b border-slate-100 px-6 py-5">
               <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">
                 Nächster Termin
@@ -305,69 +328,54 @@ export default function ClientDashboardPage() {
           </div>
 
           {/* RECOMENDACIÓN / UP-SELLING */}
-          <div className="rounded-[2rem] border border-amber-100 bg-amber-50 p-6 shadow-sm">
-            {!extraAdded ? (
-              <div className="flex h-full flex-col justify-between gap-6">
-                <div>
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-amber-600 shadow-sm">
-                    <span className="material-symbols-outlined text-3xl">
-                      {recommendation.icon}
-                    </span>
-                  </div>
-
-                  <div className="mt-5 flex items-center gap-2">
-                    <h3 className="text-xl font-black text-slate-950">
-                      {recommendation.title}
-                    </h3>
-
-                    <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-amber-700">
-                      Empfehlung
-                    </span>
-                  </div>
-
-                  <p className="mt-3 text-sm font-bold leading-6 text-amber-800/80">
-                    {recommendation.reason}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setExtraAdded(true)}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-white px-5 py-3 text-sm font-black text-amber-700 shadow-sm transition-all hover:bg-amber-100"
-                >
-                  <span className="material-symbols-outlined text-xl">add</span>
-                  Hinzufügen
-                </button>
-              </div>
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center rounded-3xl bg-white p-6 text-center shadow-sm">
-                <span className="material-symbols-outlined text-5xl text-emerald-600">
-                  check_circle
+          <div className="flex flex-col justify-between rounded-[2rem] border border-amber-100 bg-amber-50 p-6 shadow-sm">
+            <div>
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-amber-600 shadow-sm">
+                <span className="material-symbols-outlined text-3xl">
+                  {recommendation.icon}
                 </span>
+              </div>
 
-                <h3 className="mt-4 text-xl font-black text-slate-950">
-                  {recommendation.title} zur Anfrage hinzugefügt!
+              <div className="mt-5 flex flex-wrap items-center gap-2">
+                <h3 className="text-xl font-black text-slate-950">
+                  {recommendation.title}
                 </h3>
 
-                <p className="mt-2 text-sm font-medium text-slate-500">
-                  Wir bereiten alles für Ihren Termin vor.
+                <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-amber-700">
+                  Empfehlung
+                </span>
+              </div>
+
+              <p className="mt-3 text-sm font-bold leading-6 text-amber-800/80">
+                {recommendation.reason}
+              </p>
+
+              <div className="mt-5 rounded-2xl bg-white/70 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">
+                  So funktioniert es
                 </p>
 
-                <button
-                  type="button"
-                  onClick={() => setExtraAdded(false)}
-                  className="mt-5 text-xs font-black text-emerald-600 underline transition-colors hover:text-emerald-800"
-                >
-                  Rückgängig
-                </button>
+                <p className="mt-1 text-sm font-medium leading-6 text-amber-800/80">
+                  Senden Sie eine Anfrage. Unser Team prüft Verfügbarkeit,
+                  Aufwand und Terminoptionen.
+                </p>
               </div>
-            )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setRequestModalType("EXTRA_SERVICE")}
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-100 transition-all hover:bg-blue-700"
+            >
+              <span className="material-symbols-outlined text-xl">add</span>
+              Extra-Service anfragen
+            </button>
           </div>
         </div>
 
         {/* RESUMEN BÁSICO */}
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-[2rem] bg-white p-6 shadow-sm border border-slate-100">
+          <div className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-sm">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
               <span className="material-symbols-outlined">
                 cleaning_services
@@ -383,7 +391,7 @@ export default function ClientDashboardPage() {
             </p>
           </div>
 
-          <div className="rounded-[2rem] bg-white p-6 shadow-sm border border-slate-100">
+          <div className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-sm">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
               <span className="material-symbols-outlined">
                 event_available
@@ -400,6 +408,14 @@ export default function ClientDashboardPage() {
           </div>
         </div>
       </section>
+
+      {requestModalType && (
+        <ClientRequestModal
+          type={requestModalType}
+          onClose={() => setRequestModalType(null)}
+          onCreated={handleRequestCreated}
+        />
+      )}
     </main>
   )
 }

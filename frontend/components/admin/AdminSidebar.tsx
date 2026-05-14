@@ -74,6 +74,12 @@ export default function AdminSidebar() {
           label="Incidents"
           active={pathname === "/admin/incidents"}
         />
+        <SidebarItem
+          href="/admin/client-requests"
+          icon="request_page"
+          label="Client Requests"
+          active={pathname === "/admin/requests"}
+        />
 
       </nav>
 

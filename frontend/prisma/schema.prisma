@@ -78,6 +78,7 @@ model Client {
   inventories   ClientInventory[]
   deliveryLogs  DeliveryLog[]
   contracts ClientContract[]
+  requests ClientRequest[]
   user       User?
 }
 
@@ -115,6 +116,7 @@ model Service {
 
   client            Client     @relation(fields: [clientId], references: [id])
   assignments       ServiceAssignment[]
+  clientRequests ClientRequest[]
 
   // =========================
   // RECURRENCIA
@@ -322,6 +324,24 @@ model ClientContract {
   updatedAt     DateTime  @updatedAt
 
   client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model ClientRequest {
+  id            Int       @id @default(autoincrement())
+  clientId      Int
+  serviceId     Int?
+  type          String
+  status        String    @default("PENDING")
+  title         String
+  message       String?   @db.Text
+  requestedDate DateTime?
+  requestedTime String?
+  adminNotes    String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  service       Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
 }
 
 enum TimeBlockType {
