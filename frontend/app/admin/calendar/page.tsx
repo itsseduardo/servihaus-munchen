@@ -1,26 +1,41 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+
 import AdminCalendarTopbar from "@/components/admin/AdminCalendarTopbar"
 import WeeklyCalendar from "@/components/admin/WeeklyCalendar"
 import { useWeek } from "@/hooks/useWeek"
 import { ServiceType } from "@/types/service"
 
 export default function AdminCalendarPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const serviceIdFromUrl = searchParams.get("serviceId")
+
   const [currentWeek, setCurrentWeek] = useState(new Date())
   const [services, setServices] = useState<ServiceType[]>([])
+  const [openServiceId, setOpenServiceId] = useState<string | null>(
+    serviceIdFromUrl
+  )
 
   const { days } = useWeek(currentWeek)
 
-  // Fetch servicios por cada día de la semana
+  useEffect(() => {
+    setOpenServiceId(serviceIdFromUrl)
+  }, [serviceIdFromUrl])
+
   useEffect(() => {
     async function fetchServices() {
+      if (!days.length) return
+
       try {
         const results = await Promise.all(
           days.map((day) =>
-            fetch(`/api/services?date=${day.iso}`).then((res) =>
-              res.json()
-            )
+            fetch(`/api/services?date=${day.iso}`, {
+              cache: "no-store",
+            }).then((res) => res.json())
           )
         )
 
@@ -32,19 +47,34 @@ export default function AdminCalendarPage() {
       }
     }
 
-    if (days.length > 0) {
-      fetchServices()
-    }
+    fetchServices()
+    // Importante: NO usar "days" como dependencia.
+    // days puede ser un array nuevo en cada render y causar llamadas repetidas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWeek])
 
-  // Agrupar servicios por día ISO
-  const servicesByDay: Record<string, ServiceType[]> =
-    days.reduce((acc, day) => {
+  const servicesByDay: Record<string, ServiceType[]> = useMemo(() => {
+    return days.reduce((acc, day) => {
       acc[day.iso] = services.filter((service) =>
         new Date(service.date).toISOString().startsWith(day.iso)
       )
+
       return acc
     }, {} as Record<string, ServiceType[]>)
+  }, [days, services])
+
+  function handleServiceOpenedFromUrl() {
+    if (!serviceIdFromUrl) return
+
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete("serviceId")
+
+    router.replace(
+      params.toString()
+        ? `/admin/calendar?${params.toString()}`
+        : "/admin/calendar"
+    )
+  }
 
   return (
     <>
@@ -57,6 +87,8 @@ export default function AdminCalendarPage() {
         <WeeklyCalendar
           days={days}
           servicesByDay={servicesByDay}
+          openServiceId={openServiceId}
+          onServiceOpenedFromUrl={handleServiceOpenedFromUrl}
         />
       </div>
     </>

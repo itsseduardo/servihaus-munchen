@@ -68,16 +68,31 @@ export async function PATCH(
       )
     }
 
+    const adminNotes =
+      typeof body.adminNotes === "string"
+        ? body.adminNotes.trim() || null
+        : existing.adminNotes
+
+    const adminResponse =
+      typeof body.adminResponse === "string"
+        ? body.adminResponse.trim() || null
+        : existing.adminResponse
+
+    const statusChanged = existing.status !== body.status
+
     const updated = await prisma.clientRequest.update({
       where: {
         id: requestId,
       },
       data: {
         status: body.status,
-        adminNotes:
-          typeof body.adminNotes === "string"
-            ? body.adminNotes.trim() || null
-            : existing.adminNotes,
+        adminNotes,
+        adminResponse,
+        statusChangedAt: statusChanged ? new Date() : existing.statusChangedAt,
+        resolvedAt:
+          body.status === "RESOLVED" || body.status === "REJECTED"
+            ? new Date()
+            : null,
       },
       include: {
         client: true,

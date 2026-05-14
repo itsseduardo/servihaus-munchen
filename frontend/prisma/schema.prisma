@@ -339,6 +339,9 @@ model ClientRequest {
   adminNotes    String?   @db.Text
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  adminResponse   String?   @db.Text
+  statusChangedAt DateTime?
+  resolvedAt      DateTime?
 
   client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   service       Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)

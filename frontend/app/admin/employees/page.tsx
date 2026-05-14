@@ -228,10 +228,7 @@ export default function AdminEmployeesPage() {
         {/* HEADER */}
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">
-              Admin / Mitarbeiter
-            </p>
-
+          
             <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
               Mitarbeiterverwaltung
             </h1>

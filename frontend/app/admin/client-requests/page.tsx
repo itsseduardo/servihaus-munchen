@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import CreateServiceModal from "@/components/admin/CreateServiceModal"
 
 type ClientRequest = {
   id: number
@@ -16,9 +17,13 @@ type ClientRequest = {
   adminNotes?: string | null
   createdAt: string
   updatedAt: string
+  adminResponse?: string | null
+  statusChangedAt?: string | null
+  resolvedAt?: string | null
   client?: {
     id: number
     name: string
+    address?: string | null
     clientCode?: string | null
     email?: string | null
     phone?: string | null
@@ -181,6 +186,12 @@ export default function AdminClientRequestsPage() {
   const [savingStatus, setSavingStatus] = useState(false)
   const [error, setError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
+  const [adminResponse, setAdminResponse] = useState("")
+  const [actionLoading, setActionLoading] = useState(false)
+  const [createServiceRequest, setCreateServiceRequest] =
+    useState<ClientRequest | null>(null)
+
+
 
   async function fetchRequests() {
     try {
@@ -218,6 +229,7 @@ export default function AdminClientRequestsPage() {
 
   useEffect(() => {
     setAdminNotes(selectedRequest?.adminNotes || "")
+    setAdminResponse(selectedRequest?.adminResponse || "")
   }, [selectedRequest])
 
   const filteredRequests = useMemo(() => {
@@ -271,6 +283,7 @@ export default function AdminClientRequestsPage() {
         body: JSON.stringify({
           status,
           adminNotes,
+          adminResponse,
         }),
       })
 
@@ -293,6 +306,93 @@ export default function AdminClientRequestsPage() {
     } finally {
       setSavingStatus(false)
     }
+  }
+
+  async function handleCancelServiceFromRequest(request: ClientRequest) {
+    if (!request.serviceId) {
+      setError("Diese Anfrage hat keinen Service-Bezug.")
+      return
+    }
+
+    const confirmed = window.confirm(
+      "Möchten Sie diesen Service wirklich stornieren? Diese Aktion markiert den Service als storniert."
+    )
+
+    if (!confirmed) return
+
+    try {
+      setActionLoading(true)
+      setError("")
+      setSuccessMessage("")
+
+      const reason =
+        adminNotes ||
+        adminResponse ||
+        request.message ||
+        "Stornierung durch Kundenanfrage"
+
+      const cancelRes = await fetch(`/api/services/${request.serviceId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          scope: "THIS",
+          changeReason: reason,
+        }),
+      })
+
+      const cancelData = await cancelRes.json().catch(() => null)
+
+      if (!cancelRes.ok) {
+        setError(cancelData?.error || "Service konnte nicht storniert werden.")
+        return
+      }
+
+      const responseText =
+        adminResponse ||
+        "Ihr Service wurde gemäß Ihrer Anfrage storniert."
+
+      const updateRes = await fetch(`/api/admin/client-requests/${request.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: "RESOLVED",
+          adminNotes,
+          adminResponse: responseText,
+        }),
+      })
+
+      const updateData = await updateRes.json().catch(() => null)
+
+      if (!updateRes.ok) {
+        setError(
+          updateData?.error ||
+          "Service wurde storniert, aber die Anfrage konnte nicht aktualisiert werden."
+        )
+        return
+      }
+
+      setSelectedRequest(updateData)
+      setSuccessMessage("Service wurde storniert und Anfrage erledigt.")
+      await fetchRequests()
+    } catch {
+      setError("Service konnte nicht storniert werden.")
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  function openCreateServiceFromRequest(request: ClientRequest) {
+    if (!request.client) {
+      setError("Kundendaten fehlen für diese Anfrage.")
+      return
+    }
+
+    setSelectedRequest(null)
+    setCreateServiceRequest(request)
   }
 
   if (loading) {
@@ -319,9 +419,7 @@ export default function AdminClientRequestsPage() {
         {/* HEADER */}
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">
-              Admin / Kundenanfragen
-            </p>
+
 
             <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
               Kundenanfragen
@@ -578,6 +676,63 @@ export default function AdminClientRequestsPage() {
       {/* DETAIL MODAL */}
       {selectedRequest && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+          <div className="mt-6 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+              Aktionen
+            </p>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {selectedRequest.type === "CANCELLATION_REQUEST" &&
+                selectedRequest.serviceId && (
+                  <button
+                    type="button"
+                    disabled={actionLoading}
+                    onClick={() => handleCancelServiceFromRequest(selectedRequest)}
+                    className="rounded-2xl bg-rose-600 px-5 py-3 text-sm font-black text-white transition-all hover:bg-rose-700 disabled:opacity-50"
+                  >
+                    {actionLoading ? "Wird storniert..." : "Service stornieren"}
+                  </button>
+                )}
+
+              {selectedRequest.type === "EXTRA_SERVICE" && (
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={() => openCreateServiceFromRequest(selectedRequest)}
+                  className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white transition-all hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Auftrag planen
+                </button>
+              )}
+
+              {selectedRequest.type === "CHANGE_REQUEST" &&
+                selectedRequest.serviceId && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push(`/admin/calendar?serviceId=${selectedRequest.serviceId}`)
+                    }
+                    className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-black text-amber-700 transition-all hover:bg-amber-100"
+                  >
+                    Service bearbeiten
+                  </button>
+                )}
+
+              {selectedRequest.clientId && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(`/admin/clients/${selectedRequest.clientId}`)
+                  }
+                  className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition-all hover:border-blue-200 hover:text-blue-700"
+                >
+                  Kunde öffnen
+                </button>
+              )}
+            </div>
+          </div>
+
+
           <button
             type="button"
             className="absolute inset-0 cursor-default"
@@ -703,6 +858,20 @@ export default function AdminClientRequestsPage() {
               />
             </div>
 
+            <div className="mt-4">
+              <label className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                Antwort an den Kunden
+              </label>
+
+              <textarea
+                value={adminResponse}
+                onChange={(event) => setAdminResponse(event.target.value)}
+                rows={4}
+                placeholder="Diese Antwort kann später im Kundenportal angezeigt werden..."
+                className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium leading-6 text-slate-700 outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-50"
+              />
+            </div>
+
             <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {STATUS_OPTIONS.map((option) => (
                 <button
@@ -712,11 +881,10 @@ export default function AdminClientRequestsPage() {
                   onClick={() =>
                     updateRequestStatus(selectedRequest.id, option.value)
                   }
-                  className={`rounded-2xl px-4 py-3 text-sm font-black transition-all disabled:opacity-50 ${
-                    selectedRequest.status === option.value
-                      ? "bg-blue-600 text-white"
-                      : "border border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:text-blue-700"
-                  }`}
+                  className={`rounded-2xl px-4 py-3 text-sm font-black transition-all disabled:opacity-50 ${selectedRequest.status === option.value
+                    ? "bg-blue-600 text-white"
+                    : "border border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:text-blue-700"
+                    }`}
                 >
                   {option.label}
                 </button>
@@ -748,6 +916,46 @@ export default function AdminClientRequestsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {createServiceRequest?.client && (
+        <CreateServiceModal
+          selectedDate={
+            createServiceRequest.requestedDate
+              ? createServiceRequest.requestedDate.slice(0, 10)
+              : new Date().toISOString().slice(0, 10)
+          }
+          selectedTime={createServiceRequest.requestedTime || "09:00"}
+          prefilledClient={{
+            id: createServiceRequest.client.id,
+            clientCode: createServiceRequest.client.clientCode,
+            name: createServiceRequest.client.name,
+            address: createServiceRequest.client.address,
+          }}
+          lockClient
+          onClose={() => setCreateServiceRequest(null)}
+          onCreated={async () => {
+            const responseText =
+              adminResponse ||
+              "Ihr Extra-Service wurde aufgenommen und wird nun geplant."
+
+            await fetch(`/api/admin/client-requests/${createServiceRequest.id}`, {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                status: "IN_REVIEW",
+                adminNotes,
+                adminResponse: responseText,
+              }),
+            })
+
+            setCreateServiceRequest(null)
+            setSuccessMessage("Auftrag wurde geplant und Anfrage aktualisiert.")
+            await fetchRequests()
+          }}
+        />
       )}
     </main>
   )

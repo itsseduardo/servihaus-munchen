@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { isEmployeeAssignableOnDate } from "@/lib/employee-availability"
 
 interface Props {
@@ -61,6 +61,41 @@ function getEmployeeName(employee: any) {
   if (employee.fullName) return employee.fullName
 
   return [employee.firstName, employee.lastName].filter(Boolean).join(" ")
+}
+
+function getInactiveReasonLabel(reason?: string | null) {
+  switch (reason) {
+    case "SICK_LEAVE":
+      return "Krankmeldung"
+    case "MEDICAL_LEAVE":
+      return "Medizinische Abwesenheit"
+    case "TERMINATED":
+      return "Kündigung / Entlassung"
+    case "SUSPENDED":
+      return "Suspendiert"
+    case "VACATION":
+      return "Urlaub / Freistellung"
+    case "UNPAID_VACATION":
+      return "Unbezahlter Urlaub"
+    case "OTHER":
+      return "Sonstiges"
+    default:
+      return "Nicht verfügbar"
+  }
+}
+
+function formatDate(dateValue?: string | Date | null) {
+  if (!dateValue) return "-"
+
+  const date = new Date(dateValue)
+
+  if (Number.isNaN(date.getTime())) return "-"
+
+  return date.toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  })
 }
 
 export default function ServiceDetailsModal({
@@ -154,18 +189,20 @@ export default function ServiceDetailsModal({
     Number(teamDuration || 0) !==
     Number(service.teamDuration ?? service.duration ?? 0)
 
-  const hasAddressChanged = address !== (service.address || service.client?.address || "")
+  const hasAddressChanged =
+    address !== (service.address || service.client?.address || "")
 
   const hasScheduleChanged =
-    hasDateChanged || hasScheduledTimeChanged || hasDurationChanged || hasAddressChanged
+    hasDateChanged ||
+    hasScheduledTimeChanged ||
+    hasDurationChanged ||
+    hasAddressChanged
 
   const originalEmployeeIds = getAssignmentEmployeeIds(service)
     .sort((a: number, b: number) => a - b)
     .join(",")
 
-  const currentEmployeeIds = [...employeeIds]
-    .sort((a, b) => a - b)
-    .join(",")
+  const currentEmployeeIds = [...employeeIds].sort((a, b) => a - b).join(",")
 
   const hasEmployeeChanged = originalEmployeeIds !== currentEmployeeIds
   const hasStatusChanged = status !== (service.status || "assigned")
@@ -174,6 +211,36 @@ export default function ServiceDetailsModal({
     hasTimeChanged || hasScheduleChanged || hasEmployeeChanged || hasStatusChanged
 
   const requiresKey = Boolean(service.requiresKey || service.client?.requiresKey)
+
+  const visibleEmployees = useMemo(() => {
+    return employees.filter((employee) => {
+      const employeeId = Number(employee.id)
+      const selected = employeeIds.includes(employeeId)
+      const assignable = isEmployeeAssignableOnDate(
+        employee,
+        scheduledDate || service.date
+      )
+
+      // Importante:
+      // - Los disponibles aparecen.
+      // - Los ya asignados también aparecen aunque estén inactivos,
+      //   para que el admin pueda verlos y quitarlos si necesita.
+      return assignable || selected
+    })
+  }, [employees, employeeIds, scheduledDate, service.date])
+
+  const unavailableSelectedEmployees = useMemo(() => {
+    return visibleEmployees.filter((employee) => {
+      const employeeId = Number(employee.id)
+      const selected = employeeIds.includes(employeeId)
+      const assignable = isEmployeeAssignableOnDate(
+        employee,
+        scheduledDate || service.date
+      )
+
+      return selected && !assignable
+    })
+  }, [visibleEmployees, employeeIds, scheduledDate, service.date])
 
   const executeAction = async (
     selectedScope: Scope,
@@ -191,20 +258,20 @@ export default function ServiceDetailsModal({
 
       const body: any = isDelete
         ? {
-          scope: selectedScope,
-          reason:
-            changeReason.trim() ||
-            "Auftrag wurde vom Administrator storniert.",
-        }
+            scope: selectedScope,
+            reason:
+              changeReason.trim() ||
+              "Auftrag wurde vom Administrator storniert.",
+          }
         : {
-          notes,
-          importantNotes,
-          status,
-          pricingModel,
-          travelTime: Number(travelTime) || 0,
-          changeReason,
-          scope: selectedScope,
-        }
+            notes,
+            importantNotes,
+            status,
+            pricingModel,
+            travelTime: Number(travelTime) || 0,
+            changeReason,
+            scope: selectedScope,
+          }
 
       if (!isDelete) {
         if (hasDateChanged) {
@@ -254,6 +321,17 @@ export default function ServiceDetailsModal({
       const data = await res.json().catch(() => null)
 
       if (!res.ok) {
+        if (data?.employees?.length) {
+          const names = data.employees
+            .map((item: any) => `${item.name} (${item.date})`)
+            .join("\n")
+
+          alert(
+            `${data?.error || "Ein oder mehrere Mitarbeiter sind nicht verfügbar."}\n\n${names}`
+          )
+          return
+        }
+
         alert(data?.error || "Die Aktion konnte nicht ausgeführt werden.")
         return
       }
@@ -352,7 +430,7 @@ export default function ServiceDetailsModal({
 
               <select
                 value={status}
-                onChange={(e) => setStatus(e.target.value)}
+                onChange={(event) => setStatus(event.target.value)}
                 className="w-full rounded-xl border bg-white p-2.5 text-sm font-bold shadow-sm outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800"
               >
                 <option value="assigned">Geplant</option>
@@ -370,7 +448,7 @@ export default function ServiceDetailsModal({
 
               <select
                 value={pricingModel}
-                onChange={(e) => setPricingModel(e.target.value)}
+                onChange={(event) => setPricingModel(event.target.value)}
                 className="w-full rounded-xl border bg-white p-2.5 text-sm font-bold shadow-sm outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800"
               >
                 <option value="TIME">Zeitbasiert (h)</option>
@@ -386,7 +464,7 @@ export default function ServiceDetailsModal({
               <input
                 type="number"
                 value={travelTime}
-                onChange={(e) => setTravelTime(Number(e.target.value))}
+                onChange={(event) => setTravelTime(Number(event.target.value))}
                 className="w-full rounded-xl border bg-white p-2 text-sm font-bold shadow-sm dark:border-slate-700 dark:bg-slate-800"
               />
             </div>
@@ -406,7 +484,7 @@ export default function ServiceDetailsModal({
                 <input
                   type="date"
                   value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
+                  onChange={(event) => setScheduledDate(event.target.value)}
                   className="mt-1 h-11 w-full rounded-xl border px-4 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900"
                 />
               </div>
@@ -419,7 +497,7 @@ export default function ServiceDetailsModal({
                 <input
                   type="time"
                   value={scheduledTime}
-                  onChange={(e) => setScheduledTime(e.target.value)}
+                  onChange={(event) => setScheduledTime(event.target.value)}
                   className="mt-1 h-11 w-full rounded-xl border px-4 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900"
                 />
               </div>
@@ -436,10 +514,17 @@ export default function ServiceDetailsModal({
                   step="0.25"
                   min="0"
                   value={teamDuration}
-                  onChange={(e) => setTeamDuration(e.target.value)}
+                  onChange={(event) => setTeamDuration(event.target.value)}
                   className="mt-1 h-11 w-full rounded-xl border px-4 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900"
                   placeholder="z.B. 2.5"
                 />
+
+                {hasEmployeeChanged && !hasDurationChanged && (
+                  <p className="mt-2 text-xs font-bold text-blue-600">
+                    Die Kalenderdauer wird automatisch nach Anzahl der
+                    Mitarbeiter neu berechnet.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -450,7 +535,7 @@ export default function ServiceDetailsModal({
                 <input
                   type="text"
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
+                  onChange={(event) => setAddress(event.target.value)}
                   className="mt-1 h-11 w-full rounded-xl border px-4 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900"
                   placeholder="Adresse"
                 />
@@ -459,50 +544,110 @@ export default function ServiceDetailsModal({
           </section>
 
           <section className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500">
-              Zugewiesene Mitarbeiter
-            </h4>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                  Zugewiesene Mitarbeiter
+                </h4>
+
+                <p className="mt-1 text-xs font-medium text-slate-400">
+                  Es werden nur verfügbare Mitarbeiter für das gewählte Datum
+                  angezeigt. Bereits zugewiesene, aber nicht verfügbare
+                  Mitarbeiter bleiben sichtbar, damit sie entfernt werden können.
+                </p>
+              </div>
+
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+                {employeeIds.length} ausgewählt
+              </span>
+            </div>
+
+            {unavailableSelectedEmployees.length > 0 && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">
+                  Hinweis
+                </p>
+
+                <p className="mt-1 text-sm font-bold leading-6 text-amber-800">
+                  Einige bereits zugewiesene Mitarbeiter sind für dieses Datum
+                  nicht verfügbar. Sie können entfernt, aber nicht erneut für
+                  dieses Datum hinzugefügt werden.
+                </p>
+              </div>
+            )}
 
             {employees.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 p-4 text-sm font-bold text-slate-500">
                 Keine Mitarbeiter geladen.
               </div>
+            ) : visibleEmployees.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 p-4 text-sm font-bold text-slate-500">
+                Keine verfügbaren Mitarbeiter für dieses Datum.
+              </div>
             ) : (
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {employees
-                  .filter((employee) =>
-                    isEmployeeAssignableOnDate(employee, scheduledDate || service.date)
+                {visibleEmployees.map((employee) => {
+                  const employeeId = Number(employee.id)
+                  const selected = employeeIds.includes(employeeId)
+
+                  const assignable = isEmployeeAssignableOnDate(
+                    employee,
+                    scheduledDate || service.date
                   )
-                  .map((employee) => {
-                    const employeeId = Number(employee.id)
-                    const selected = employeeIds.includes(employeeId)
 
-                    return (
-                      <button
-                        key={employee.id}
-                        type="button"
-                        onClick={() => {
-                          setEmployeeIds((prev) =>
-                            selected
-                              ? prev.filter((id) => id !== employeeId)
-                              : [...prev, employeeId]
-                          )
-                        }}
-                        className={`rounded-xl border-2 p-3 text-left transition-all ${selected
+                  const canToggle = assignable || selected
+
+                  return (
+                    <button
+                      key={employee.id}
+                      type="button"
+                      disabled={!canToggle}
+                      onClick={() => {
+                        if (!canToggle) return
+
+                        setEmployeeIds((prev) =>
+                          selected
+                            ? prev.filter((id) => id !== employeeId)
+                            : [...prev, employeeId]
+                        )
+                      }}
+                      className={`rounded-xl border-2 p-3 text-left transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
+                        selected
+                          ? assignable
                             ? "border-blue-500 bg-blue-50 text-blue-700 ring-4 ring-blue-500/10"
-                            : "border-slate-100 hover:border-slate-300 dark:border-slate-800"
-                          }`}
-                      >
-                        <p className="text-sm font-black">
-                          {getEmployeeName(employee)}
-                        </p>
+                            : "border-amber-400 bg-amber-50 text-amber-800 ring-4 ring-amber-500/10"
+                          : "border-slate-100 hover:border-slate-300 dark:border-slate-800"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-black">
+                            {getEmployeeName(employee)}
+                          </p>
 
-                        <p className="text-xs font-medium text-slate-500">
-                          {employee.profession || "Mitarbeiter"}
-                        </p>
-                      </button>
-                    )
-                  })}
+                          <p className="text-xs font-medium text-slate-500">
+                            {employee.profession || "Mitarbeiter"}
+                          </p>
+                        </div>
+
+                        {selected && (
+                          <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black shadow-sm">
+                            Zugewiesen
+                          </span>
+                        )}
+                      </div>
+
+                      {!assignable && (
+                        <div className="mt-3 rounded-lg bg-white/70 p-2 text-[11px] font-bold leading-5 text-amber-800">
+                          {getInactiveReasonLabel(employee.inactiveReason)}
+                          {employee.inactiveUntil
+                            ? ` · bis ${formatDate(employee.inactiveUntil)}`
+                            : ""}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </section>
@@ -521,7 +666,7 @@ export default function ServiceDetailsModal({
                 <input
                   type="datetime-local"
                   value={actualStartTime}
-                  onChange={(e) => setActualStartTime(e.target.value)}
+                  onChange={(event) => setActualStartTime(event.target.value)}
                   className="h-11 w-full rounded-xl border px-4 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900"
                 />
               </div>
@@ -534,7 +679,7 @@ export default function ServiceDetailsModal({
                 <input
                   type="datetime-local"
                   value={actualEndTime}
-                  onChange={(e) => setActualEndTime(e.target.value)}
+                  onChange={(event) => setActualEndTime(event.target.value)}
                   className="h-11 w-full rounded-xl border px-4 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900"
                 />
               </div>
@@ -549,7 +694,7 @@ export default function ServiceDetailsModal({
                 <input
                   placeholder="z.B. Kunde hat Termin verschoben, Mitarbeiter gewechselt, Zeit manuell korrigiert..."
                   value={changeReason}
-                  onChange={(e) => setChangeReason(e.target.value)}
+                  onChange={(event) => setChangeReason(event.target.value)}
                   className="h-10 w-full rounded-lg border-2 border-rose-200 bg-white px-3 text-xs outline-none focus:border-rose-500 dark:bg-slate-900"
                 />
               </div>
@@ -564,7 +709,7 @@ export default function ServiceDetailsModal({
 
               <textarea
                 value={importantNotes}
-                onChange={(e) => setImportantNotes(e.target.value)}
+                onChange={(event) => setImportantNotes(event.target.value)}
                 className="h-32 w-full resize-none rounded-xl border-2 border-rose-100 bg-rose-50/30 p-4 text-sm outline-none focus:border-rose-400 dark:border-rose-900/30 dark:bg-rose-900/10"
               />
             </div>
@@ -576,7 +721,7 @@ export default function ServiceDetailsModal({
 
               <textarea
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={(event) => setNotes(event.target.value)}
                 className="h-32 w-full resize-none rounded-xl border p-4 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900"
               />
             </div>
@@ -646,10 +791,11 @@ export default function ServiceDetailsModal({
                   key={option.id}
                   type="button"
                   onClick={() => setScope(option.id as Scope)}
-                  className={`w-full rounded-2xl border-2 p-4 text-left transition-all ${scope === option.id
+                  className={`w-full rounded-2xl border-2 p-4 text-left transition-all ${
+                    scope === option.id
                       ? "border-blue-500 bg-blue-50 ring-4 ring-blue-500/10 dark:bg-blue-900/20"
                       : "border-slate-100 dark:border-slate-800"
-                    }`}
+                  }`}
                 >
                   <p className="text-sm font-bold">{option.title}</p>
                   <p className="text-[10px] font-medium text-slate-500">

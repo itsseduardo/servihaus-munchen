@@ -107,7 +107,9 @@ export async function POST(req: Request) {
         : null
 
     const serviceId =
-      body.serviceId !== undefined && body.serviceId !== null && body.serviceId !== ""
+      body.serviceId !== undefined &&
+      body.serviceId !== null &&
+      body.serviceId !== ""
         ? Number(body.serviceId)
         : null
 
@@ -155,17 +157,19 @@ export async function POST(req: Request) {
       },
     })
 
-    await prisma.auditLog.create({
-      data: {
-        action: "CREATE_CLIENT_REQUEST",
-        entityType: "CLIENT_REQUEST",
-        entityId: request.id,
-        userId: String(result.client.id),
-        oldValue: null,
-        newValue: JSON.stringify(request),
-        reason: "Client created request",
-      },
-    }).catch(() => null)
+    await prisma.auditLog
+      .create({
+        data: {
+          action: "CREATE_CLIENT_REQUEST",
+          entityType: "CLIENT_REQUEST",
+          entityId: request.id,
+          userId: String(result.client.id),
+          oldValue: null,
+          newValue: JSON.stringify(request),
+          reason: "Client created request",
+        },
+      })
+      .catch(() => null)
 
     return NextResponse.json(request)
   } catch (error) {
