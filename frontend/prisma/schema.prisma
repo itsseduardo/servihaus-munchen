@@ -246,6 +246,7 @@ model DeliveryLog {
   date         DateTime
   items        Json     // Guardamos el recibo de lo que se entregó
   createdAt    DateTime @default(now())
+  notes String? @db.Text
 
   client       Client   @relation(fields: [clientId], references: [id])
 }
