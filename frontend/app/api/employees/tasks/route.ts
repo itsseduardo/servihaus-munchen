@@ -52,6 +52,16 @@ function isTaskFilter(value: string | null): value is TaskFilter {
   return value === "today" || value === "tomorrow" || value === "history"
 }
 
+function formatTimeWindow(value?: Date | null) {
+  if (!value) return null
+
+  return value.toLocaleTimeString("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+}
+
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions)
@@ -90,6 +100,8 @@ export async function GET(req: Request) {
       )
     }
 
+    const employee = user.employee
+
     const { today, tomorrow, dayAfterTomorrow } = getDateRanges()
 
     const dateQuery =
@@ -99,7 +111,12 @@ export async function GET(req: Request) {
           ? { gte: tomorrow, lt: dayAfterTomorrow }
           : { lt: today }
 
-    const cancelledStatuses = ["cancelled", "canceled", "CANCELLED", "CANCELED"]
+    const cancelledStatuses = [
+      "cancelled",
+      "canceled",
+      "CANCELLED",
+      "CANCELED",
+    ]
 
     const services = await prisma.service.findMany({
       where: {
@@ -111,7 +128,12 @@ export async function GET(req: Request) {
         },
         ...(filter === "history"
           ? {
-            status: "completed",
+            assignments: {
+              some: {
+                employeeId: user.employee.id,
+                status: "completed",
+              },
+            },
           }
           : {
             status: {
@@ -126,6 +148,9 @@ export async function GET(req: Request) {
           include: {
             employee: true,
           },
+          orderBy: {
+            assignedAt: "asc",
+          },
         },
       },
       orderBy:
@@ -134,31 +159,63 @@ export async function GET(req: Request) {
           : [{ startTime: "asc" }, { date: "asc" }],
     })
 
-    const tasks = services.map((service) => ({
+    const tasks = services.map((service) => {
+      const ownAssignment = service.assignments.find(
+        (assignment) => assignment.employeeId === employee.id
+      )
+      
+
+    const ownStatus = normalizeTaskStatus(
+      ownAssignment?.status || service.status
+    )
+
+    return {
       ...service,
-      status: normalizeTaskStatus(service.status),
-      timeWindow:
-        service.startTime
-          ? service.startTime.toLocaleTimeString("de-DE", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-          })
-          : null,
+
+      /**
+       * Este status ahora representa el estado individual del empleado
+       * para que TaskCard avance según su propio assignment.
+       */
+      status: ownStatus,
+
+      /**
+       * Estado general del servicio, útil si más adelante queremos mostrar
+       * que otros compañeros ya empezaron o terminaron.
+       */
+      serviceStatus: normalizeTaskStatus(service.status),
+
+      /**
+       * Datos individuales del empleado dentro de este servicio.
+       */
+      assignmentId: ownAssignment?.id || null,
+      assignmentStatus: ownStatus,
+      assignmentActualTravelStartTime:
+        ownAssignment?.actualTravelStartTime || null,
+      assignmentActualStartTime: ownAssignment?.actualStartTime || null,
+      assignmentActualEndTime: ownAssignment?.actualEndTime || null,
+      assignmentOvertimeJustification:
+        ownAssignment?.overtimeJustification || null,
+      assignmentExtraHoursReason: ownAssignment?.extraHoursReason || null,
+
+      /**
+       * Se mantienen los campos generales del servicio para compatibilidad.
+       */
+      timeWindow: formatTimeWindow(service.startTime),
       duration:
         service.teamDuration ??
         service.duration ??
         service.billedHours ??
         null,
-    }))
+    }
+  })
 
-    return NextResponse.json(tasks)
-  } catch (error) {
-    console.error("ERROR FETCHING EMPLOYEE TASKS:", error)
+  return NextResponse.json(tasks)
+} catch (error) {
+  console.error("ERROR FETCHING EMPLOYEE TASKS:", error)
 
-    return NextResponse.json(
-      { error: "Error interno" },
-      { status: 500 }
-    )
-  }
+  return NextResponse.json(
+    { error: "Error interno" },
+    { status: 500 }
+  )
+}
 }

@@ -1,73 +1,195 @@
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 
+function parsePositiveNumber(value: unknown) {
+  const number = Number(value)
+
+  if (!Number.isFinite(number) || number <= 0) {
+    return null
+  }
+
+  return number
+}
+
+function buildInternalReference() {
+  const now = new Date()
+
+  const datePart = now
+    .toISOString()
+    .slice(0, 10)
+    .replace(/-/g, "")
+
+  const timePart = now
+    .toISOString()
+    .slice(11, 19)
+    .replace(/:/g, "")
+
+  return `LIEFERUNG-${datePart}-${timePart}`
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { clientId, deliveryCode, date, items } = body
 
-    if (!clientId || !deliveryCode || !items || items.length === 0) {
-      return NextResponse.json({ error: "Faltan datos en el albarán (SAMP)" }, { status: 400 })
+    const clientInventoryId = Number(body.clientInventoryId)
+    const productId = Number(body.productId)
+    const quantityDelivered = parsePositiveNumber(body.quantityDelivered)
+
+    const reference =
+      typeof body.reference === "string" && body.reference.trim()
+        ? body.reference.trim()
+        : typeof body.deliveryCode === "string" && body.deliveryCode.trim()
+          ? body.deliveryCode.trim()
+          : buildInternalReference()
+
+    const notes =
+      typeof body.notes === "string" && body.notes.trim()
+        ? body.notes.trim()
+        : "Schnelle Materiallieferung aus Bestandswarnung."
+
+    if (!Number.isInteger(clientInventoryId)) {
+      return NextResponse.json(
+        { error: "Ungültige Inventarposition." },
+        { status: 400 }
+      )
     }
 
-    // Transacción: O se hace todo perfecto, o no se guarda nada
+    if (!Number.isInteger(productId)) {
+      return NextResponse.json(
+        { error: "Ungültiges Produkt." },
+        { status: 400 }
+      )
+    }
+
+    if (!quantityDelivered) {
+      return NextResponse.json(
+        { error: "Bitte geben Sie eine gültige Liefermenge ein." },
+        { status: 400 }
+      )
+    }
+
     const result = await prisma.$transaction(async (tx) => {
-      
-      // 1. Guardar el registro oficial del documento SAMP
-      const deliveryLog = await tx.deliveryLog.create({
-        data: {
-          deliveryCode,
-          clientId: parseInt(clientId),
-          date: new Date(date),
-          items: items 
-        }
+      const clientInventory = await tx.clientInventory.findUnique({
+        where: {
+          id: clientInventoryId,
+        },
+        include: {
+          client: true,
+          product: true,
+        },
       })
 
-      // 2. Lógica de traspaso de inventario
-      for (const item of items) {
-        const productId = parseInt(item.productId)
-        const qty = parseFloat(item.quantity)
-
-        // A. QUITAR DEL ALMACÉN CENTRAL (Servihaus)
-        const product = await tx.product.findUnique({ where: { id: productId } })
-        if (product) {
-          await tx.product.update({
-            where: { id: productId },
-            // Restamos la cantidad que acabamos de subir a la furgoneta
-            data: { globalStock: product.globalStock - qty } 
-          })
-        }
-
-        // B. PONER EN LA DESPENSA DEL CLIENTE
-        const existing = await tx.clientInventory.findFirst({
-          where: { clientId: parseInt(clientId), productId }
-        })
-
-        if (existing) {
-          // Si ya tenía, le sumamos
-          await tx.clientInventory.update({
-            where: { id: existing.id },
-            data: { quantity: existing.quantity + qty }
-          })
-        } else {
-          // Si es un producto nuevo para este cliente, lo creamos
-          await tx.clientInventory.create({
-            data: {
-              clientId: parseInt(clientId),
-              productId,
-              quantity: qty
-            }
-          })
-        }
+      if (!clientInventory) {
+        throw new Error("CLIENT_INVENTORY_NOT_FOUND")
       }
 
-      return deliveryLog
+      if (clientInventory.productId !== productId) {
+        throw new Error("PRODUCT_MISMATCH")
+      }
+
+      const product = await tx.product.findUnique({
+        where: {
+          id: productId,
+        },
+      })
+
+      if (!product) {
+        throw new Error("PRODUCT_NOT_FOUND")
+      }
+
+      const currentGlobalStock = Number(product.globalStock || 0)
+      const nextGlobalStock = currentGlobalStock - quantityDelivered
+
+      if (nextGlobalStock < 0) {
+        throw new Error(`INSUFFICIENT_STOCK:${product.name}`)
+      }
+
+      const updatedProduct = await tx.product.update({
+        where: {
+          id: productId,
+        },
+        data: {
+          globalStock: nextGlobalStock,
+        },
+      })
+
+      const updatedClientInventory = await tx.clientInventory.update({
+        where: {
+          id: clientInventoryId,
+        },
+        data: {
+          quantity: Number(clientInventory.quantity || 0) + quantityDelivered,
+        },
+        include: {
+          client: true,
+          product: true,
+        },
+      })
+
+      const deliveryLog = await tx.deliveryLog.create({
+        data: {
+          clientId: clientInventory.clientId,
+          deliveryCode: reference,
+          date: new Date(),
+          items: [
+            {
+              productId,
+              quantity: quantityDelivered,
+            },
+          ],
+          notes,
+        },
+      })
+
+      return {
+        success: true,
+        deliveryLog,
+        product: updatedProduct,
+        clientInventory: updatedClientInventory,
+      }
     })
 
-    return NextResponse.json(result)
-
+    return NextResponse.json(result, { status: 201 })
   } catch (error) {
-    console.error("DELIVERY POST ERROR:", error)
-    return NextResponse.json({ error: "Error al registrar el documento SAMP" }, { status: 500 })
+    console.error("ADMIN INVENTORY DELIVER ERROR:", error)
+
+    if (error instanceof Error) {
+      if (error.message === "CLIENT_INVENTORY_NOT_FOUND") {
+        return NextResponse.json(
+          { error: "Die Inventarposition wurde nicht gefunden." },
+          { status: 404 }
+        )
+      }
+
+      if (error.message === "PRODUCT_MISMATCH") {
+        return NextResponse.json(
+          { error: "Das Produkt passt nicht zur Inventarposition." },
+          { status: 400 }
+        )
+      }
+
+      if (error.message === "PRODUCT_NOT_FOUND") {
+        return NextResponse.json(
+          { error: "Das Produkt wurde nicht gefunden." },
+          { status: 404 }
+        )
+      }
+
+      if (error.message.startsWith("INSUFFICIENT_STOCK:")) {
+        const productName = error.message.replace("INSUFFICIENT_STOCK:", "")
+
+        return NextResponse.json(
+          {
+            error: `Nicht genug Bestand im Zentrallager für "${productName}".`,
+          },
+          { status: 400 }
+        )
+      }
+    }
+
+    return NextResponse.json(
+      { error: "Materiallieferung konnte nicht gespeichert werden." },
+      { status: 500 }
+    )
   }
 }

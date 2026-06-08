@@ -98,6 +98,71 @@ function formatDate(dateValue?: string | Date | null) {
   })
 }
 
+function formatTime(dateValue?: string | Date | null) {
+  if (!dateValue) return "-"
+
+  const date = new Date(dateValue)
+
+  if (Number.isNaN(date.getTime())) return "-"
+
+  return date.toLocaleTimeString("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+}
+
+function getAssignmentStatusLabel(status?: string | null) {
+  switch (status) {
+    case "assigned":
+      return "Geplant"
+    case "traveling":
+      return "Unterwegs"
+    case "in_progress":
+      return "In Arbeit"
+    case "completed":
+      return "Abgeschlossen"
+    default:
+      return "Geplant"
+  }
+}
+
+function getAssignmentStatusClass(status?: string | null) {
+  switch (status) {
+    case "traveling":
+      return "border-blue-100 bg-blue-50 text-blue-700"
+    case "in_progress":
+      return "border-amber-100 bg-amber-50 text-amber-700"
+    case "completed":
+      return "border-emerald-100 bg-emerald-50 text-emerald-700"
+    default:
+      return "border-slate-200 bg-slate-100 text-slate-600"
+  }
+}
+
+function getWorkedDurationLabel(start?: string | Date | null, end?: string | Date | null) {
+  if (!start || !end) return "-"
+
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return "-"
+  }
+
+  const diffMinutes = Math.max(
+    0,
+    Math.round((endDate.getTime() - startDate.getTime()) / 60000)
+  )
+
+  const hours = Math.floor(diffMinutes / 60)
+  const minutes = diffMinutes % 60
+
+  if (hours > 0 && minutes > 0) return `${hours}h ${minutes}min`
+  if (hours > 0) return `${hours}h`
+  return `${minutes}min`
+}
+
 export default function ServiceDetailsModal({
   service,
   onClose,
@@ -207,8 +272,18 @@ export default function ServiceDetailsModal({
   const hasEmployeeChanged = originalEmployeeIds !== currentEmployeeIds
   const hasStatusChanged = status !== (service.status || "assigned")
 
+  const hasImportantNotesChanged =
+    importantNotes !== (service.importantNotes || "")
+
+  const hasNotesChanged = notes !== (service.notes || "")
+
   const requiresChangeReason =
-    hasTimeChanged || hasScheduleChanged || hasEmployeeChanged || hasStatusChanged
+    hasTimeChanged ||
+    hasScheduleChanged ||
+    hasEmployeeChanged ||
+    hasStatusChanged ||
+    hasImportantNotesChanged ||
+    hasNotesChanged
 
   const requiresKey = Boolean(service.requiresKey || service.client?.requiresKey)
 
@@ -258,20 +333,20 @@ export default function ServiceDetailsModal({
 
       const body: any = isDelete
         ? {
-            scope: selectedScope,
-            reason:
-              changeReason.trim() ||
-              "Auftrag wurde vom Administrator storniert.",
-          }
+          scope: selectedScope,
+          reason:
+            changeReason.trim() ||
+            "Auftrag wurde vom Administrator storniert.",
+        }
         : {
-            notes,
-            importantNotes,
-            status,
-            pricingModel,
-            travelTime: Number(travelTime) || 0,
-            changeReason,
-            scope: selectedScope,
-          }
+          notes,
+          importantNotes,
+          status,
+          pricingModel,
+          travelTime: Number(travelTime) || 0,
+          changeReason,
+          scope: selectedScope,
+        }
 
       if (!isDelete) {
         if (hasDateChanged) {
@@ -611,13 +686,12 @@ export default function ServiceDetailsModal({
                             : [...prev, employeeId]
                         )
                       }}
-                      className={`rounded-xl border-2 p-3 text-left transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
-                        selected
-                          ? assignable
-                            ? "border-blue-500 bg-blue-50 text-blue-700 ring-4 ring-blue-500/10"
-                            : "border-amber-400 bg-amber-50 text-amber-800 ring-4 ring-amber-500/10"
-                          : "border-slate-100 hover:border-slate-300 dark:border-slate-800"
-                      }`}
+                      className={`rounded-xl border-2 p-3 text-left transition-all disabled:cursor-not-allowed disabled:opacity-50 ${selected
+                        ? assignable
+                          ? "border-blue-500 bg-blue-50 text-blue-700 ring-4 ring-blue-500/10"
+                          : "border-amber-400 bg-amber-50 text-amber-800 ring-4 ring-amber-500/10"
+                        : "border-slate-100 hover:border-slate-300 dark:border-slate-800"
+                        }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -652,10 +726,206 @@ export default function ServiceDetailsModal({
             )}
           </section>
 
+          <section className="space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                  Zeiterfassung pro Mitarbeiter
+                </h4>
+
+                <p className="mt-1 text-xs font-medium text-slate-400">
+                  Jeder Mitarbeiter hat eigene Start- und Endzeiten. Die Zeiten des
+                  Auftrags sind nur die Zusammenfassung.
+                </p>
+              </div>
+
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
+                {service.assignments?.length || 0} Mitarbeiter
+              </span>
+            </div>
+
+            {!service.assignments?.length ? (
+              <div className="rounded-xl border border-dashed border-slate-300 p-4 text-sm font-bold text-slate-500">
+                Keine Mitarbeiter zugewiesen.
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-800">
+                <div className="hidden md:block">
+                  <table className="min-w-full">
+                    <thead className="bg-slate-50 dark:bg-slate-900">
+                      <tr className="text-left">
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                          Mitarbeiter
+                        </th>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                          Fahrt
+                        </th>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                          Start
+                        </th>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                          Ende
+                        </th>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                          Dauer
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {service.assignments.map((assignment: any) => {
+                        const employee = assignment.employee
+                        const name = employee
+                          ? getEmployeeName(employee)
+                          : "Mitarbeiter"
+
+                        return (
+                          <tr key={assignment.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
+                            <td className="px-4 py-4">
+                              <p className="text-sm font-black text-slate-900 dark:text-white">
+                                {name}
+                              </p>
+
+                              <p className="mt-0.5 text-xs font-medium text-slate-400">
+                                {employee?.profession || "Mitarbeiter"}
+                              </p>
+                            </td>
+
+                            <td className="px-4 py-4">
+                              <span
+                                className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getAssignmentStatusClass(
+                                  assignment.status
+                                )}`}
+                              >
+                                {getAssignmentStatusLabel(assignment.status)}
+                              </span>
+                            </td>
+
+                            <td className="px-4 py-4 text-sm font-bold text-slate-600 dark:text-slate-300">
+                              {formatTime(assignment.actualTravelStartTime)}
+                            </td>
+
+                            <td className="px-4 py-4 text-sm font-bold text-slate-600 dark:text-slate-300">
+                              {formatTime(assignment.actualStartTime)}
+                            </td>
+
+                            <td className="px-4 py-4 text-sm font-bold text-slate-600 dark:text-slate-300">
+                              {formatTime(assignment.actualEndTime)}
+                            </td>
+
+                            <td className="px-4 py-4 text-sm font-black text-slate-900 dark:text-white">
+                              {getWorkedDurationLabel(
+                                assignment.actualStartTime,
+                                assignment.actualEndTime
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="divide-y divide-slate-100 dark:divide-slate-800 md:hidden">
+                  {service.assignments.map((assignment: any) => {
+                    const employee = assignment.employee
+                    const name = employee ? getEmployeeName(employee) : "Mitarbeiter"
+
+                    return (
+                      <div key={assignment.id} className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-black text-slate-900 dark:text-white">
+                              {name}
+                            </p>
+
+                            <p className="mt-1 text-xs font-medium text-slate-400">
+                              {employee?.profession || "Mitarbeiter"}
+                            </p>
+                          </div>
+
+                          <span
+                            className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getAssignmentStatusClass(
+                              assignment.status
+                            )}`}
+                          >
+                            {getAssignmentStatusLabel(assignment.status)}
+                          </span>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-2">
+                          <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
+                            <p className="text-[10px] font-black uppercase text-slate-400">
+                              Fahrt
+                            </p>
+                            <p className="mt-1 text-sm font-bold">
+                              {formatTime(assignment.actualTravelStartTime)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
+                            <p className="text-[10px] font-black uppercase text-slate-400">
+                              Start
+                            </p>
+                            <p className="mt-1 text-sm font-bold">
+                              {formatTime(assignment.actualStartTime)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
+                            <p className="text-[10px] font-black uppercase text-slate-400">
+                              Ende
+                            </p>
+                            <p className="mt-1 text-sm font-bold">
+                              {formatTime(assignment.actualEndTime)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
+                            <p className="text-[10px] font-black uppercase text-slate-400">
+                              Dauer
+                            </p>
+                            <p className="mt-1 text-sm font-bold">
+                              {getWorkedDurationLabel(
+                                assignment.actualStartTime,
+                                assignment.actualEndTime
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        {(assignment.overtimeJustification ||
+                          assignment.extraHoursReason) && (
+                            <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 p-3">
+                              <p className="text-[10px] font-black uppercase text-amber-600">
+                                Begründung Mehrzeit
+                              </p>
+
+                              <p className="mt-1 text-xs font-bold leading-5 text-amber-800">
+                                {assignment.overtimeJustification ||
+                                  assignment.extraHoursReason}
+                              </p>
+                            </div>
+                          )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </section>
+
           <section className="rounded-2xl border border-blue-100 bg-blue-50/30 p-5 dark:border-blue-900/30 dark:bg-blue-900/10">
             <h4 className="text-[10px] font-bold uppercase tracking-widest text-blue-600">
-              Echtzeit-Erfassung
+              Zusammenfassung Auftrag
             </h4>
+
+            <p className="mt-1 text-xs font-medium text-blue-700">
+              Diese Zeiten sind die Zusammenfassung des gesamten Auftrags: erster Start und letztes Ende.
+            </p>
 
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1">
@@ -791,11 +1061,10 @@ export default function ServiceDetailsModal({
                   key={option.id}
                   type="button"
                   onClick={() => setScope(option.id as Scope)}
-                  className={`w-full rounded-2xl border-2 p-4 text-left transition-all ${
-                    scope === option.id
-                      ? "border-blue-500 bg-blue-50 ring-4 ring-blue-500/10 dark:bg-blue-900/20"
-                      : "border-slate-100 dark:border-slate-800"
-                  }`}
+                  className={`w-full rounded-2xl border-2 p-4 text-left transition-all ${scope === option.id
+                    ? "border-blue-500 bg-blue-50 ring-4 ring-blue-500/10 dark:bg-blue-900/20"
+                    : "border-slate-100 dark:border-slate-800"
+                    }`}
                 >
                   <p className="text-sm font-bold">{option.title}</p>
                   <p className="text-[10px] font-medium text-slate-500">

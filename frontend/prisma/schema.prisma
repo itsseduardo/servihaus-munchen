@@ -142,10 +142,19 @@ enum PricingModel {
 }
 
 model ServiceAssignment {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   serviceId  Int
   employeeId Int
-  assignedAt DateTime?
+  assignedAt DateTime? @default(now())
+
+  status String @default("assigned")
+
+  actualTravelStartTime DateTime?
+  actualStartTime       DateTime?
+  actualEndTime         DateTime?
+
+  extraHoursReason      String? @db.Text
+  overtimeJustification String? @db.Text
 
   employee Employee @relation(fields: [employeeId], references: [id])
   service  Service  @relation(fields: [serviceId], references: [id])

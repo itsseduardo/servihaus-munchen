@@ -21,12 +21,12 @@ export function isEmployeeInactiveOnDate(
   employee: EmployeeAvailabilityInput,
   dateValue: string | Date = new Date()
 ) {
-  const targetDate = startOfDay(new Date(dateValue))
-
   const isMarkedInactive =
     employee.isActive === false || employee.active === false
 
   if (!isMarkedInactive) return false
+
+  const targetDate = startOfDay(new Date(dateValue))
 
   const inactiveSince = employee.inactiveSince
     ? startOfDay(new Date(employee.inactiveSince))

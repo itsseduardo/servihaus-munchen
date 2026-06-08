@@ -44,6 +44,24 @@ async function requireAdmin() {
   }
 }
 
+function parseDateOnly(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) {
+    return null
+  }
+
+  const [year, month, day] = value.slice(0, 10).split("-").map(Number)
+
+  if (!year || !month || !day) {
+    return null
+  }
+
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0))
+}
+
+function formatDateForAudit(date: Date | null) {
+  return date ? date.toISOString() : null
+}
+
 export async function PATCH(
   req: Request,
   context: { params: Promise<{ id: string }> }
@@ -94,10 +112,20 @@ export async function PATCH(
           ? body.inactiveDetails.trim()
           : ""
 
-      const inactiveUntil =
-        typeof body.inactiveUntil === "string" && body.inactiveUntil
-          ? new Date(body.inactiveUntil)
-          : null
+      const inactiveSinceFromBody = parseDateOnly(body.inactiveSince)
+      const inactiveUntil = parseDateOnly(body.inactiveUntil)
+
+      const inactiveSince = inactiveSinceFromBody || new Date()
+
+      if (inactiveUntil && inactiveUntil < inactiveSince) {
+        return NextResponse.json(
+          {
+            error:
+              "Das Enddatum der Inaktivität darf nicht vor dem Startdatum liegen.",
+          },
+          { status: 400 }
+        )
+      }
 
       const updatedEmployee = await prisma.employee.update({
         where: {
@@ -108,7 +136,7 @@ export async function PATCH(
           isActive: false,
           inactiveReason,
           inactiveDetails: inactiveDetails || null,
-          inactiveSince: new Date(),
+          inactiveSince,
           inactiveUntil,
           reactivatedAt: null,
         },
@@ -127,13 +155,16 @@ export async function PATCH(
             inactiveDetails: employee.inactiveDetails,
             inactiveSince: employee.inactiveSince,
             inactiveUntil: employee.inactiveUntil,
+            reactivatedAt: employee.reactivatedAt,
           }),
           newValue: JSON.stringify({
             active: false,
             isActive: false,
             inactiveReason,
-            inactiveDetails,
-            inactiveUntil,
+            inactiveDetails: inactiveDetails || null,
+            inactiveSince: formatDateForAudit(inactiveSince),
+            inactiveUntil: formatDateForAudit(inactiveUntil),
+            reactivatedAt: null,
           }),
           reason: inactiveDetails || inactiveReason,
         },
@@ -170,10 +201,16 @@ export async function PATCH(
           inactiveDetails: employee.inactiveDetails,
           inactiveSince: employee.inactiveSince,
           inactiveUntil: employee.inactiveUntil,
+          reactivatedAt: employee.reactivatedAt,
         }),
         newValue: JSON.stringify({
           active: true,
           isActive: true,
+          inactiveReason: null,
+          inactiveDetails: null,
+          inactiveSince: null,
+          inactiveUntil: null,
+          reactivatedAt: new Date(),
         }),
         reason: "Employee reactivated by admin",
       },

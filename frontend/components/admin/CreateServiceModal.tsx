@@ -144,6 +144,9 @@ export default function CreateServiceModal({
 
   const [pricingModel, setPricingModel] = useState<PricingModel>("TIME")
   const [travelTime, setTravelTime] = useState(0)
+  const [importantNotesScope, setImportantNotesScope] = useState<"THIS" | "ALL">(
+    "THIS"
+  )
 
   const selectedEmployeeObjects = useMemo(() => {
     return employees.filter((employee) =>
@@ -388,6 +391,7 @@ export default function CreateServiceModal({
       employees: selectedEmployees,
       notes,
       importantNotes,
+      importantNotesScope,
 
       isRecurring,
       recurrenceRule: isRecurring ? recurrenceRule : null,
@@ -819,6 +823,54 @@ export default function CreateServiceModal({
                     placeholder="Besonderheiten vor Ort..."
                     className="h-24 w-full resize-none rounded-xl border-2 border-rose-100 bg-rose-50/30 p-4 text-sm outline-none transition-all focus:border-rose-400 focus:ring-0 dark:border-rose-900/30 dark:bg-rose-900/10"
                   />
+                  {isRecurring && importantNotes.trim() && (
+                    <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 p-4">
+                      <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">
+                        Gültigkeit der wichtigen Notiz
+                      </p>
+
+                      <p className="mt-1 text-xs font-bold leading-5 text-amber-800/80">
+                        Entscheiden Sie, ob diese wichtige Notiz nur für den ersten Termin oder
+                        für die komplette Serie gelten soll.
+                      </p>
+
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={() => setImportantNotesScope("THIS")}
+                          className={`rounded-xl border-2 p-3 text-left transition-all ${importantNotesScope === "THIS"
+                              ? "border-amber-500 bg-white text-amber-800 ring-4 ring-amber-500/10"
+                              : "border-amber-100 bg-amber-50 text-amber-700"
+                            }`}
+                        >
+                          <span className="block text-sm font-black">
+                            Nur diesen Termin
+                          </span>
+
+                          <span className="mt-1 block text-xs font-medium text-amber-700/70">
+                            Beispiel: Heute Seife mitbringen.
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setImportantNotesScope("ALL")}
+                          className={`rounded-xl border-2 p-3 text-left transition-all ${importantNotesScope === "ALL"
+                              ? "border-amber-500 bg-white text-amber-800 ring-4 ring-amber-500/10"
+                              : "border-amber-100 bg-amber-50 text-amber-700"
+                            }`}
+                        >
+                          <span className="block text-sm font-black">
+                            Alle Termine der Serie
+                          </span>
+
+                          <span className="mt-1 block text-xs font-medium text-amber-700/70">
+                            Beispiel: Immer Schlüssel mitnehmen.
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>

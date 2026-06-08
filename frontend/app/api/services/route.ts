@@ -236,16 +236,19 @@ async function createRecurringInstance(
       status: "assigned",
       requiresKey: body.requiresKey || false,
       notes: body.notes || null,
-      importantNotes: body.importantNotes || null,
+      importantNotes:
+        body.importantNotesScope === "ALL"
+          ? body.importantNotes || null
+          : null,
       clientId,
       assignments: employees?.length
         ? {
-            create: employees.map((id: number) => ({
-              employee: {
-                connect: { id },
-              },
-            })),
-          }
+          create: employees.map((id: number) => ({
+            employee: {
+              connect: { id },
+            },
+          })),
+        }
         : undefined,
     },
   })
@@ -365,8 +368,8 @@ export async function POST(req: Request) {
 
     let client = clientId
       ? await prisma.client.findUnique({
-          where: { id: Number(clientId) },
-        })
+        where: { id: Number(clientId) },
+      })
       : null
 
     if (!client && clientCode) {
@@ -414,12 +417,12 @@ export async function POST(req: Request) {
         clientId: client.id,
         assignments: employeeIds.length
           ? {
-              create: employeeIds.map((id: number) => ({
-                employee: {
-                  connect: { id },
-                },
-              })),
-            }
+            create: employeeIds.map((id: number) => ({
+              employee: {
+                connect: { id },
+              },
+            })),
+          }
           : undefined,
       },
     })
@@ -490,11 +493,11 @@ export async function GET(req: Request) {
       ...service,
       time: service.startTime
         ? service.startTime.toLocaleTimeString("de-DE", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-            timeZone: "UTC",
-          })
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+          timeZone: "UTC",
+        })
         : null,
     }))
 

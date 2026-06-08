@@ -41,6 +41,19 @@ function getStatusStyles(status: string) {
   }
 }
 
+function normalizeStatus(status?: string | null): TaskStatus {
+  if (
+    status === "assigned" ||
+    status === "traveling" ||
+    status === "in_progress" ||
+    status === "completed"
+  ) {
+    return status
+  }
+
+  return "assigned"
+}
+
 function formatTime(dateValue?: string | Date | null) {
   if (!dateValue) return ""
 
@@ -103,6 +116,44 @@ function getDurationLabel(task: any) {
   return `${minutes}min`
 }
 
+function getAssignmentStartTime(task: any) {
+  return task.assignmentActualStartTime || null
+}
+
+function getAssignmentTravelStartTime(task: any) {
+  return task.assignmentActualTravelStartTime || null
+}
+
+function getAssignmentEndTime(task: any) {
+  return task.assignmentActualEndTime || null
+}
+
+function getWorkedHours(task: any, endDate = new Date()) {
+  const startValue = getAssignmentStartTime(task)
+
+  if (!startValue) return 0
+
+  const startDate = new Date(startValue)
+
+  if (Number.isNaN(startDate.getTime())) return 0
+
+  return (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)
+}
+
+function getActualTimeSummary(task: any) {
+  const travelStart = getAssignmentTravelStartTime(task)
+  const start = getAssignmentStartTime(task)
+  const end = getAssignmentEndTime(task)
+
+  if (!travelStart && !start && !end) return null
+
+  return {
+    travelStart: formatTime(travelStart),
+    start: formatTime(start),
+    end: formatTime(end),
+  }
+}
+
 export default function TaskCard({
   task,
   onOvertimeTriggered,
@@ -112,7 +163,9 @@ export default function TaskCard({
   const [loadingStatus, setLoadingStatus] = useState<TaskStatus | null>(null)
   const [error, setError] = useState("")
 
-  const status = (task.status || "assigned") as TaskStatus
+  const status = normalizeStatus(task.assignmentStatus || task.status)
+  const serviceStatus = normalizeStatus(task.serviceStatus || task.status)
+
   const clientName = task.client?.name || "Kunde"
   const serviceCode = task.serviceCode?.code || task.code || "Service"
   const serviceDescription =
@@ -121,6 +174,7 @@ export default function TaskCard({
   const requiresKey = Boolean(task.requiresKey || task.client?.requiresKey)
   const importantNotes = task.importantNotes || ""
   const notes = task.notes || ""
+  const actualTimeSummary = getActualTimeSummary(task)
 
   async function updateStatus(newStatus: TaskStatus) {
     try {
@@ -152,18 +206,10 @@ export default function TaskCard({
 
   function handleFinishWork() {
     const now = new Date()
-
-    const startTime = task.actualStartTime
-      ? new Date(task.actualStartTime)
-      : task.startTime
-        ? new Date(task.startTime)
-        : new Date(now.getTime() - 2 * 60 * 60 * 1000)
-
     const expectedHours =
       Number(task.teamDuration ?? task.duration ?? task.billedHours ?? 2) || 2
 
-    const workedHours =
-      (now.getTime() - startTime.getTime()) / (1000 * 60 * 60)
+    const workedHours = getWorkedHours(task, now)
 
     if (workedHours > expectedHours + 0.15) {
       onOvertimeTriggered(task)
@@ -189,6 +235,13 @@ export default function TaskCard({
             <p className="mt-1 text-sm font-medium text-slate-500">
               {serviceDescription}
             </p>
+
+            {actualTimeSummary?.start && (
+              <p className="mt-2 text-xs font-bold text-emerald-700">
+                Deine Zeit: {actualTimeSummary.start}
+                {actualTimeSummary.end ? ` - ${actualTimeSummary.end}` : ""}
+              </p>
+            )}
           </div>
 
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
@@ -201,7 +254,6 @@ export default function TaskCard({
 
   return (
     <article className="overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-sm">
-      {/* Header */}
       <div className="border-b border-slate-100 p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -213,6 +265,12 @@ export default function TaskCard({
               >
                 {getStatusLabel(status)}
               </span>
+
+              {serviceStatus !== status && (
+                <span className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700">
+                  Auftrag: {getStatusLabel(serviceStatus)}
+                </span>
+              )}
 
               <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
                 {serviceCode}
@@ -239,7 +297,6 @@ export default function TaskCard({
         </div>
       </div>
 
-      {/* Body */}
       <div className="grid gap-4 p-5">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl bg-slate-50 p-4">
@@ -252,7 +309,7 @@ export default function TaskCard({
 
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
-                  Zeit
+                  Geplante Zeit
                 </p>
                 <p className="mt-1 text-sm font-black text-slate-800">
                   {getTimeDisplay(task)}
@@ -280,6 +337,36 @@ export default function TaskCard({
             </div>
           </div>
         </div>
+
+        {actualTimeSummary && (
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined text-blue-600">
+                punch_clock
+              </span>
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-500">
+                  Deine Zeiterfassung
+                </p>
+
+                <div className="mt-2 grid gap-1 text-sm font-bold text-blue-800">
+                  {actualTimeSummary.travelStart && (
+                    <p>Fahrt begonnen: {actualTimeSummary.travelStart}</p>
+                  )}
+
+                  {actualTimeSummary.start && (
+                    <p>Arbeit begonnen: {actualTimeSummary.start}</p>
+                  )}
+
+                  {actualTimeSummary.end && (
+                    <p>Arbeit beendet: {actualTimeSummary.end}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="rounded-2xl bg-slate-50 p-4">
           <div className="flex items-start gap-3">
@@ -368,7 +455,6 @@ export default function TaskCard({
         )}
       </div>
 
-      {/* Actions */}
       <div className="border-t border-slate-100 bg-slate-50/60 p-5">
         {status === "assigned" && (
           <button
@@ -378,7 +464,9 @@ export default function TaskCard({
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-blue-100 transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <span className="material-symbols-outlined">directions_car</span>
-            {loadingStatus === "traveling" ? "Wird gespeichert..." : "Fahrt beginnen"}
+            {loadingStatus === "traveling"
+              ? "Wird gespeichert..."
+              : "Fahrt beginnen"}
           </button>
         )}
 
