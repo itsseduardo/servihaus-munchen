@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
+import type { Prisma } from "@prisma/client"
 
 import { authOptions } from "@/lib/auth-options"
 import { prisma } from "@/lib/prisma"
@@ -67,10 +68,7 @@ export async function GET(req: Request) {
     const session = await getServerSession(authOptions)
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "No autorizado" },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
     if (session.user.role !== "EMPLOYEE") {
@@ -101,7 +99,6 @@ export async function GET(req: Request) {
     }
 
     const employee = user.employee
-
     const { today, tomorrow, dayAfterTomorrow } = getDateRanges()
 
     const dateQuery =
@@ -118,29 +115,31 @@ export async function GET(req: Request) {
       "CANCELED",
     ]
 
-    const services = await prisma.service.findMany({
-      where: {
-        date: dateQuery,
-        assignments: {
-          some: {
-            employeeId: user.employee.id,
-          },
-        },
-        ...(filter === "history"
-          ? {
+    const serviceWhere: Prisma.ServiceWhereInput =
+      filter === "history"
+        ? {
+            date: dateQuery,
             assignments: {
               some: {
-                employeeId: user.employee.id,
+                employeeId: employee.id,
                 status: "completed",
               },
             },
           }
-          : {
+        : {
+            date: dateQuery,
+            assignments: {
+              some: {
+                employeeId: employee.id,
+              },
+            },
             status: {
               notIn: cancelledStatuses,
             },
-          }),
-      },
+          }
+
+    const services = await prisma.service.findMany({
+      where: serviceWhere,
       include: {
         client: true,
         serviceCode: true,
@@ -163,59 +162,43 @@ export async function GET(req: Request) {
       const ownAssignment = service.assignments.find(
         (assignment) => assignment.employeeId === employee.id
       )
-      
 
-    const ownStatus = normalizeTaskStatus(
-      ownAssignment?.status || service.status
+      const ownStatus = normalizeTaskStatus(
+        ownAssignment?.status || service.status
+      )
+
+      return {
+        ...service,
+
+        status: ownStatus,
+        serviceStatus: normalizeTaskStatus(service.status),
+
+        assignmentId: ownAssignment?.id || null,
+        assignmentStatus: ownStatus,
+        assignmentActualTravelStartTime:
+          ownAssignment?.actualTravelStartTime || null,
+        assignmentActualStartTime: ownAssignment?.actualStartTime || null,
+        assignmentActualEndTime: ownAssignment?.actualEndTime || null,
+        assignmentOvertimeJustification:
+          ownAssignment?.overtimeJustification || null,
+        assignmentExtraHoursReason: ownAssignment?.extraHoursReason || null,
+
+        timeWindow: formatTimeWindow(service.startTime),
+        duration:
+          service.teamDuration ??
+          service.duration ??
+          service.billedHours ??
+          null,
+      }
+    })
+
+    return NextResponse.json(tasks)
+  } catch (error) {
+    console.error("ERROR FETCHING EMPLOYEE TASKS:", error)
+
+    return NextResponse.json(
+      { error: "Error interno" },
+      { status: 500 }
     )
-
-    return {
-      ...service,
-
-      /**
-       * Este status ahora representa el estado individual del empleado
-       * para que TaskCard avance según su propio assignment.
-       */
-      status: ownStatus,
-
-      /**
-       * Estado general del servicio, útil si más adelante queremos mostrar
-       * que otros compañeros ya empezaron o terminaron.
-       */
-      serviceStatus: normalizeTaskStatus(service.status),
-
-      /**
-       * Datos individuales del empleado dentro de este servicio.
-       */
-      assignmentId: ownAssignment?.id || null,
-      assignmentStatus: ownStatus,
-      assignmentActualTravelStartTime:
-        ownAssignment?.actualTravelStartTime || null,
-      assignmentActualStartTime: ownAssignment?.actualStartTime || null,
-      assignmentActualEndTime: ownAssignment?.actualEndTime || null,
-      assignmentOvertimeJustification:
-        ownAssignment?.overtimeJustification || null,
-      assignmentExtraHoursReason: ownAssignment?.extraHoursReason || null,
-
-      /**
-       * Se mantienen los campos generales del servicio para compatibilidad.
-       */
-      timeWindow: formatTimeWindow(service.startTime),
-      duration:
-        service.teamDuration ??
-        service.duration ??
-        service.billedHours ??
-        null,
-    }
-  })
-
-  return NextResponse.json(tasks)
-} catch (error) {
-  console.error("ERROR FETCHING EMPLOYEE TASKS:", error)
-
-  return NextResponse.json(
-    { error: "Error interno" },
-    { status: 500 }
-  )
-}
+  }
 }
